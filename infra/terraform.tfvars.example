@@ -1,0 +1,18 @@
+# Copy this file to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored — never commit it.
+
+project_name  = "voicebridge"
+aws_region    = "ap-northeast-2"
+instance_type = "m5.large"
+
+rds_instance_class = "db.r5.large"
+redis_node_type    = "cache.m5.large"
+
+# Restrict to your own IP, e.g. "1.2.3.4/32" — never 0.0.0.0/0.
+ssh_allowed_cidr = "<YOUR_IP>/32"
+
+# Name of an existing EC2 key pair created in the AWS Console.
+ssh_key_name = "<YOUR_KEY_PAIR_NAME>"
+
+db_name     = "voicebridge"
+db_username = "voicebridge_admin"
