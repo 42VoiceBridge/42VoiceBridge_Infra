@@ -11,11 +11,10 @@ EC2(앱) + RDS MySQL + ElastiCache Redis + S3(녹음/TTS 오디오)로 구성된
 
 이 구성은 **서울 리전 기준 24/7 가동 시 시간당 약 $0.61, 월 약 $445**가
 발생합니다 (EC2 m5.large + RDS db.r5.large + ElastiCache cache.m5.large 기준).
-
-**친구 AWS 계정 예산은 $100입니다. 절대 상시 가동하지 마세요.**
+**절대 상시 가동하지 마세요.**
 
 > **테스트가 끝나면 반드시 `terraform destroy`를 실행하세요.**
-> `apply` 상태로 며칠만 방치해도 예산을 초과할 수 있습니다.
+> `apply` 상태로 며칠만 방치해도 비용이 크게 늘어날 수 있습니다.
 
 ## 📂 계층형(Layered) 구조
 
@@ -25,8 +24,8 @@ EC2(앱) + RDS MySQL + ElastiCache Redis + S3(녹음/TTS 오디오)로 구성된
 ```mermaid
 graph TB
     subgraph L1["1_base — 의존성 없음"]
-        VPC["VPC · 서브넷 3개"]
-        SG["보안그룹 3개<br/>(app-sg · rds-sg · redis-sg)"]
+        VPC["VPC, 서브넷 3개"]
+        SG["보안그룹 3개<br/>(app-sg, rds-sg, redis-sg)"]
     end
 
     subgraph L2["2_storage"]
@@ -36,7 +35,7 @@ graph TB
     end
 
     subgraph L3["3_application"]
-        EC2["EC2 · Elastic IP"]
+        EC2["EC2, Elastic IP"]
         IAM["IAM Role/Policy/Instance Profile"]
     end
 
@@ -44,9 +43,9 @@ graph TB
         CICD["GitHub Actions OIDC<br/>(자동배포 붙일 때 추가 예정)"]
     end
 
-    L1 -- "private_subnet_ids<br/>rds_sg_id · redis_sg_id" --> L2
+    L1 -- "private_subnet_ids<br/>rds_sg_id, redis_sg_id" --> L2
     L1 -- "public_subnet_id<br/>app_sg_id" --> L3
-    L2 -- "s3_bucket_arn · rds_secret_arn<br/>rds_endpoint · redis_endpoint" --> L3
+    L2 -- "s3_bucket_arn, rds_secret_arn<br/>rds_endpoint, redis_endpoint" --> L3
     L3 -.향후 추가.-> L4
 ```
 
@@ -134,7 +133,7 @@ cd ../1_base && terraform destroy
 ```
 
 **절대 잊지 마세요.** 위 비용 경고 참고 — `apply` 상태를 며칠만 방치해도
-$100 예산을 초과할 수 있습니다.
+비용이 크게 늘어날 수 있습니다.
 
 ## 연결 정보 확인
 

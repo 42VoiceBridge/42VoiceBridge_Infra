@@ -2,7 +2,7 @@
 
 [42VoiceBridge_BE](https://github.com/42VoiceBridge/42VoiceBridge_BE) 백엔드가 올라가는 AWS 인프라를 Terraform으로 관리하는 저장소입니다. EC2(앱) + RDS MySQL + ElastiCache Redis + S3(녹음/TTS 오디오)로 구성되어 있으며, AI 서버와 네이버 클로바 보이스는 이 인프라 범위 밖의 외부 서비스입니다.
 
-> ⚠️ 친구 AWS 계정을 빌려 쓰는 구조라 예산이 $100로 빠듯합니다. 상시 가동하지 않고 테스트할 때만 `apply` → 끝나면 즉시 `destroy` 합니다. 자세한 비용/실행 순서는 [`docs/GUIDE.md`](docs/GUIDE.md) 참고.
+> ⚠️ 상시 가동하지 않고 테스트할 때만 `apply` → 끝나면 즉시 `destroy` 합니다. 자세한 비용/실행 순서는 [`docs/GUIDE.md`](docs/GUIDE.md) 참고.
 
 ## 기술 스택
 
@@ -29,7 +29,7 @@ graph TB
 
         subgraph VPC["VPC (10.0.0.0/16)"]
             subgraph PUB["퍼블릭 서브넷"]
-                EC2["EC2 (app-sg)<br/>Elastic IP · Spring Boot"]
+                EC2["EC2 (app-sg)<br/>Elastic IP, Spring Boot"]
             end
 
             subgraph PRIV["프라이빗 서브넷 x2 (AZ 분리)"]
@@ -59,9 +59,11 @@ graph TB
 
 단일 파일 대신 `1_base`(VPC/서브넷/보안그룹) → `2_storage`(RDS/Redis/S3) → `3_application`(EC2/IAM) 3개 레이어로 나눠 관리합니다. 의존 방향, 실행/destroy 순서, 레이어별 output 조회 방법 등 실제로 손 움직이기 전에 필요한 내용은 전부 [`docs/GUIDE.md`](docs/GUIDE.md)에 있습니다.
 
-## 운영 노트
+## 운영
 
-인프라 설계·운영은 혼자 맡고 있습니다. 레이어를 나눠 상태를 분리해 둔 이유도 팀 리뷰 없이 혼자 작업할 때 한 실수가 전체 스택에 번지지 않게 하기 위함입니다 — 예를 들어 `3_application`만 잘못 만졌을 때 `1_base`/`2_storage`는 건드리지 않고 그 레이어만 다시 apply/destroy할 수 있습니다.
+| 역할 | 담당 |
+|---|---|
+| 인프라 설계, 운영 | 김주영 |
 
 ## 더 알아보기
 
