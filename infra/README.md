@@ -22,6 +22,34 @@ EC2(앱) + RDS MySQL + ElastiCache Redis + S3(녹음/TTS 오디오)로 구성된
 단일 파일 대신 3개의 레이어로 나눠 관리합니다. 의존 방향은 반드시
 **1_base → 2_storage → 3_application** 한 방향으로만 흐릅니다.
 
+```mermaid
+graph TB
+    subgraph L1["1_base — 의존성 없음"]
+        VPC["VPC · 서브넷 3개"]
+        SG["보안그룹 3개<br/>(app-sg · rds-sg · redis-sg)"]
+    end
+
+    subgraph L2["2_storage"]
+        RDS["RDS MySQL"]
+        REDIS["ElastiCache Redis"]
+        S3["S3"]
+    end
+
+    subgraph L3["3_application"]
+        EC2["EC2 · Elastic IP"]
+        IAM["IAM Role/Policy/Instance Profile"]
+    end
+
+    subgraph L4["4_exposure — 아직 없음"]
+        CICD["GitHub Actions OIDC<br/>(자동배포 붙일 때 추가 예정)"]
+    end
+
+    L1 -- "private_subnet_ids<br/>rds_sg_id · redis_sg_id" --> L2
+    L1 -- "public_subnet_id<br/>app_sg_id" --> L3
+    L2 -- "s3_bucket_arn · rds_secret_arn<br/>rds_endpoint · redis_endpoint" --> L3
+    L3 -.향후 추가.-> L4
+```
+
 ```
 environments/dev/
 ├── 1_base/          # VPC, 서브넷, IGW, 라우팅 테이블, 보안그룹 3개(app/rds/redis)
