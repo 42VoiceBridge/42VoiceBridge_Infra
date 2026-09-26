@@ -1,0 +1,9 @@
+# Copy this file to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored — never commit it.
+
+project_name  = "voicebridge"
+aws_region    = "ap-northeast-2"
+instance_type = "m5.large"
+
+# Name of an existing EC2 key pair created in the AWS Console.
+ssh_key_name = "<YOUR_KEY_PAIR_NAME>"

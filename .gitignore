@@ -1,4 +1,4 @@
-infra/.terraform/
-infra/*.tfstate*
-infra/terraform.tfvars
-!infra/terraform.tfvars.example
+infra/**/.terraform/
+infra/**/*.tfstate*
+infra/**/terraform.tfvars
+!infra/**/terraform.tfvars.example

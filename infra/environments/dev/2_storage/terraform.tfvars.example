@@ -1,0 +1,11 @@
+# Copy this file to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored — never commit it.
+
+project_name = "voicebridge"
+aws_region   = "ap-northeast-2"
+
+rds_instance_class = "db.r5.large"
+redis_node_type    = "cache.m5.large"
+
+db_name     = "voicebridge"
+db_username = "voicebridge_admin"
