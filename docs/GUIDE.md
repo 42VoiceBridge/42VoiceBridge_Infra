@@ -1,36 +1,32 @@
-# 42VoiceBridge AWS Infra — Guide
+# 42VoiceBridge AWS Infra (Terraform)
 
-This is the AWS infrastructure for the 42VoiceBridge backend: EC2 (app) + RDS
-MySQL + ElastiCache Redis + S3 (recordings/TTS audio). The AI server and Naver
-CLOVA Voice are external services, outside the scope of this infrastructure.
+EC2(앱) + RDS MySQL + ElastiCache Redis + S3(녹음/TTS 오디오)로 구성된
+42VoiceBridge 백엔드 인프라입니다. AI 서버와 네이버 클로바 보이스는 이 인프라
+범위 밖의 외부 서비스입니다.
 
-> The full list of environment variables the application needs, and where each
-> value comes from, lives in
-> [42VoiceBridge_BE's `docs/DEPLOYMENT.md`](https://github.com/42VoiceBridge/42VoiceBridge_BE/blob/develop/docs/DEPLOYMENT.md).
+> 실제 애플리케이션이 필요로 하는 환경변수 전체 목록과 "이 값을 어디서
+> 가져오는지"는 [42VoiceBridge_BE의 `docs/DEPLOYMENT.md`](https://github.com/42VoiceBridge/42VoiceBridge_BE/blob/develop/docs/DEPLOYMENT.md)를 참고하세요.
 
-## ⚠️ Read this first: cost warning
+## ⚠️ 반드시 읽으세요: 비용 경고
 
-This setup costs **roughly $0.61/hour, about $445/month, if run 24/7 in the
-Seoul region** (based on EC2 m5.large + RDS db.r5.large + ElastiCache
-cache.m5.large).
+이 구성은 **서울 리전 기준 24/7 가동 시 시간당 약 $0.61, 월 약 $445**가
+발생합니다 (EC2 m5.large + RDS db.r5.large + ElastiCache cache.m5.large 기준).
 
-**The AWS account this runs on has a $100 budget. Never leave it running
-continuously.**
+**친구 AWS 계정 예산은 $100입니다. 절대 상시 가동하지 마세요.**
 
-> **Always run `terraform destroy` once you're done testing.**
-> Leaving `apply`'d resources up for even a few days can blow past the budget.
+> **테스트가 끝나면 반드시 `terraform destroy`를 실행하세요.**
+> `apply` 상태로 며칠만 방치해도 예산을 초과할 수 있습니다.
 
-## 📂 Layered structure
+## 📂 계층형(Layered) 구조
 
-Instead of one flat set of files, resources are split into 3 layers. The
-dependency direction always flows **1_base → 2_storage → 3_application**, one
-way only.
+단일 파일 대신 3개의 레이어로 나눠 관리합니다. 의존 방향은 반드시
+**1_base → 2_storage → 3_application** 한 방향으로만 흐릅니다.
 
 ```mermaid
 graph TB
-    subgraph L1["1_base — no dependencies"]
-        VPC["VPC · 3 subnets"]
-        SG["3 security groups<br/>(app-sg · rds-sg · redis-sg)"]
+    subgraph L1["1_base — 의존성 없음"]
+        VPC["VPC · 서브넷 3개"]
+        SG["보안그룹 3개<br/>(app-sg · rds-sg · redis-sg)"]
     end
 
     subgraph L2["2_storage"]
@@ -44,69 +40,67 @@ graph TB
         IAM["IAM Role/Policy/Instance Profile"]
     end
 
-    subgraph L4["4_exposure — not yet built"]
-        CICD["GitHub Actions OIDC<br/>(planned for automated deploys)"]
+    subgraph L4["4_exposure — 아직 없음"]
+        CICD["GitHub Actions OIDC<br/>(자동배포 붙일 때 추가 예정)"]
     end
 
     L1 -- "private_subnet_ids<br/>rds_sg_id · redis_sg_id" --> L2
     L1 -- "public_subnet_id<br/>app_sg_id" --> L3
     L2 -- "s3_bucket_arn · rds_secret_arn<br/>rds_endpoint · redis_endpoint" --> L3
-    L3 -.planned.-> L4
+    L3 -.향후 추가.-> L4
 ```
 
 ```
 environments/dev/
-├── 1_base/          # VPC, subnets, IGW, route tables, all 3 security groups (app/rds/redis)
+├── 1_base/          # VPC, 서브넷, IGW, 라우팅 테이블, 보안그룹 3개(app/rds/redis)
 ├── 2_storage/       # RDS MySQL, ElastiCache Redis, S3
 └── 3_application/   # EC2, Elastic IP, IAM Role/Policy/Instance Profile
 ```
 
-Each layer keeps its own local `terraform.tfstate`. A higher layer reads a
-lower layer's state through `data "terraform_remote_state"`
-(`backend = "local"`, `path = "../N_layer/terraform.tfstate"`).
+레이어마다 `terraform.tfstate`를 로컬에 독립적으로 가지며, 상위 레이어는
+하위 레이어의 상태를 `data "terraform_remote_state"`로 읽어 값을 가져옵니다
+(`backend = "local"`, `path = "../N_레이어/terraform.tfstate"`).
 
-- **1_base**: no dependencies (top-level layer). All 3 security groups
-  (app-sg, rds-sg, redis-sg) live here because rds-sg/redis-sg need to
-  reference app-sg as their ingress source — splitting them across layers
-  would create a circular dependency.
-- **2_storage**: reads 1_base's outputs (private subnet IDs, rds-sg/redis-sg
-  IDs).
-- **3_application**: reads 1_base's outputs (public subnet ID, app-sg ID) and
-  2_storage's outputs (S3 bucket ARN, RDS/Redis endpoints, Secrets Manager
-  ARN).
-- **4_exposure**: doesn't exist yet. Reserved for wiring up GitHub Actions
-  CI/CD for automated deploys later.
+- **1_base**: 의존성 없음 (최상위 레이어). SG 3개(app-sg, rds-sg, redis-sg)를
+  전부 여기 둔 이유는 rds-sg/redis-sg가 app-sg를 참조해야 하는데, 이 셋이
+  서로 다른 레이어에 흩어지면 순환 참조가 생기기 때문입니다.
+- **2_storage**: 1_base의 output(프라이빗 서브넷 ID, rds-sg/redis-sg ID)을
+  참조합니다.
+- **3_application**: 1_base의 output(퍼블릭 서브넷 ID, app-sg ID)과
+  2_storage의 output(S3 버킷 ARN, RDS/Redis 엔드포인트, Secrets Manager
+  ARN)을 참조합니다.
+- **4_exposure**: 아직 없습니다. GitHub Actions CI/CD로 자동 배포를 붙일 때
+  추가할 자리입니다.
 
-Each layer only exports outputs for resources it actually creates with
-`resource` (e.g. 3_application only created EC2/EIP, so it only outputs
-`ec2_public_ip` — RDS/Redis endpoints must be read from 2_storage, the layer
-that actually created them). Because of this, if you want every connection
-value in one place, follow the "Checking connection info" section below and
-query `terraform output` per layer.
+각 레이어는 자신이 직접 `resource`로 만든 것만 `outputs.tf`에 내보냅니다
+(예: 3_application은 EC2/EIP만 만들었으므로 `ec2_public_ip`만 출력하고,
+RDS/Redis 엔드포인트는 그걸 실제로 만든 2_storage의 output을 그대로 확인해야
+합니다). 이 원칙 때문에 모든 연결 정보를 한 곳에서 보고 싶다면 아래 "연결
+정보 확인" 절의 안내를 따라 레이어별로 `terraform output`을 조회하세요.
 
-## Prerequisites
+## 사전 준비
 
-1. In the AWS Console → EC2 → Key Pairs, create a new key pair and keep the
-   `.pem` file somewhere safe. You'll use this key pair name for
-   `3_application`'s `ssh_key_name` variable.
-2. In each layer directory, copy `terraform.tfvars.example` to
-   `terraform.tfvars` and fill in real values (gitignored, never committed).
+1. AWS 콘솔 → EC2 → 키 페어(Key Pairs)에서 새 키 페어를 생성하고 `.pem` 파일을
+   안전하게 보관하세요. 이 키 페어 이름을 `3_application`의 `ssh_key_name`
+   변수에 사용합니다.
+2. 각 레이어 디렉터리에서 `terraform.tfvars.example`을 복사해
+   `terraform.tfvars`를 만들고 실제 값을 채웁니다 (`.gitignore`에 포함되어
+   커밋되지 않습니다).
 
    ```bash
    cp terraform.tfvars.example terraform.tfvars
    ```
 
-   - `1_base`'s `ssh_allowed_cidr`: restrict to your own IP (e.g.
-     `1.2.3.4/32`). **Never `0.0.0.0/0`.**
-   - `3_application`'s `ssh_key_name`: the key pair name from step 1.
+   - `1_base`의 `ssh_allowed_cidr`: 본인 IP만 허용 (예: `1.2.3.4/32`).
+     **`0.0.0.0/0` 금지.**
+   - `3_application`의 `ssh_key_name`: 위에서 만든 키 페어 이름.
 
-3. Make sure AWS credentials are configured (`aws configure` or environment
-   variables).
+3. AWS 자격증명이 설정되어 있어야 합니다 (`aws configure` 또는 환경변수).
 
-## Deploy order (follow this exactly)
+## 실행 순서 (반드시 아래 순서대로)
 
-Deploy layers bottom-up. Since higher layers read lower layers' state files,
-skipping the order will break `terraform_remote_state` lookups.
+하위 레이어부터 순서대로 배포합니다. 상위 레이어가 하위 레이어의 상태 파일을
+참조하므로 순서를 건너뛰면 `terraform_remote_state` 조회가 실패합니다.
 
 ```bash
 cd environments/dev/1_base
@@ -125,12 +119,11 @@ terraform plan
 terraform apply
 ```
 
-## When you're done testing — destroy in reverse order
+## 테스트가 끝나면 — 반드시 역순으로 destroy
 
-**Destroying a lower layer first breaks the higher layers that reference it**
-(subnets, security groups, the S3 bucket, etc. disappear out from under them,
-and destroy/apply fails with an error). Always go
-`3_application → 2_storage → 1_base`.
+**하위 레이어를 먼저 지우면 상위 레이어가 참조하던 대상(서브넷, 보안그룹,
+S3 버킷 등)이 사라져 destroy/apply가 에러로 실패합니다.** 반드시
+`3_application → 2_storage → 1_base` 역순으로 진행하세요.
 
 ```bash
 cd environments/dev/3_application && terraform destroy
@@ -140,28 +133,28 @@ cd ../2_storage && terraform destroy
 cd ../1_base && terraform destroy
 ```
 
-**Don't forget this.** See the cost warning above — leaving `apply`'d
-resources up for even a few days can blow past the $100 budget.
+**절대 잊지 마세요.** 위 비용 경고 참고 — `apply` 상태를 며칠만 방치해도
+$100 예산을 초과할 수 있습니다.
 
-## Checking connection info
+## 연결 정보 확인
 
-Each layer only shows the outputs for what it actually built.
+레이어별로 자신이 만든 리소스의 output만 확인할 수 있습니다.
 
-| What you want | Where to look |
+| 확인하려는 값 | 위치 |
 |---|---|
-| EC2 public IP | `cd environments/dev/3_application && terraform output ec2_public_ip` |
-| RDS endpoint / Secrets Manager ARN | `cd environments/dev/2_storage && terraform output rds_endpoint` / `terraform output rds_secret_arn` |
-| Redis endpoint / port | `cd environments/dev/2_storage && terraform output redis_endpoint` / `terraform output redis_port` |
-| S3 bucket name | `cd environments/dev/2_storage && terraform output s3_bucket_name` |
+| EC2 퍼블릭 IP | `cd environments/dev/3_application && terraform output ec2_public_ip` |
+| RDS 엔드포인트 / Secrets Manager ARN | `cd environments/dev/2_storage && terraform output rds_endpoint` / `terraform output rds_secret_arn` |
+| Redis 엔드포인트 / 포트 | `cd environments/dev/2_storage && terraform output redis_endpoint` / `terraform output redis_port` |
+| S3 버킷명 | `cd environments/dev/2_storage && terraform output s3_bucket_name` |
 
-## Looking up the RDS password
+## RDS 비밀번호 확인하기
 
-The RDS master password never lives in code — AWS Secrets Manager manages it
-automatically (`manage_master_user_password = true`). The EC2 IAM role is
-also granted the minimum `secretsmanager:GetSecretValue` permission needed to
-read that one secret (`environments/dev/3_application/iam.tf`).
+RDS 마스터 비밀번호는 코드에 없으며 AWS Secrets Manager가 자동 관리합니다
+(`manage_master_user_password = true`). EC2 IAM 역할에도 이 시크릿을 읽을 수
+있는 `secretsmanager:GetSecretValue` 권한만 최소로 부여되어 있습니다
+(`environments/dev/3_application/iam.tf`).
 
-**CLI (locally or from inside the EC2 instance):**
+**CLI (로컬 또는 EC2 안에서):**
 
 ```bash
 cd environments/dev/2_storage
@@ -170,33 +163,33 @@ aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" \
   --query 'SecretString' --output text | jq .
 ```
 
-**Console:** AWS Console → Secrets Manager → select the secret linked to the
-RDS instance → "Retrieve secret value".
+**콘솔:** AWS 콘솔 → Secrets Manager → 시크릿 목록에서 RDS 인스턴스와 연결된
+시크릿을 선택 → "Retrieve secret value".
 
-## Writing `.env` after connecting to EC2
+## EC2 접속 후 `.env` 작성 예시
 
 ```bash
 cd environments/dev/3_application
 ssh -i /path/to/key.pem ec2-user@$(terraform output -raw ec2_public_ip)
 ```
 
-After connecting, fill in the application's `.env` like this. Look up each
-value using the commands in "Checking connection info" above.
+EC2에 접속한 뒤, 애플리케이션 `.env`를 아래와 같이 채웁니다. 값은 위
+"연결 정보 확인" 절의 명령으로 조회합니다.
 
 ```env
-DB_HOST=<2_storage's rds_endpoint>
+DB_HOST=<2_storage의 rds_endpoint 값>
 DB_PORT=3306
 DB_NAME=voicebridge
 DB_USERNAME=voicebridge_admin
-DB_PASSWORD=<the "password" field from the Secrets Manager lookup above>
+DB_PASSWORD=<위 Secrets Manager 조회 결과의 password 값>
 
-REDIS_HOST=<2_storage's redis_endpoint>
-REDIS_PORT=<2_storage's redis_port>
+REDIS_HOST=<2_storage의 redis_endpoint 값>
+REDIS_PORT=<2_storage의 redis_port 값>
 
-S3_BUCKET=<2_storage's s3_bucket_name>
+S3_BUCKET=<2_storage의 s3_bucket_name 값>
 AWS_REGION=ap-northeast-2
 ```
 
-The application uses `DefaultCredentialsProvider`, so you never need to put
-an access key in `.env` — the IAM Instance Profile attached to EC2 already
-provides S3 access and Secrets Manager read permission.
+애플리케이션은 `DefaultCredentialsProvider`를 사용하므로 액세스 키를 `.env`에
+넣을 필요가 없습니다 — EC2에 붙은 IAM Instance Profile이 S3 접근 권한과
+Secrets Manager 읽기 권한을 제공합니다.
