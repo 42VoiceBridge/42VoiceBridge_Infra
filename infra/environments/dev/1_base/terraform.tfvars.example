@@ -1,0 +1,8 @@
+# Copy this file to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored — never commit it.
+
+project_name = "voicebridge"
+aws_region   = "ap-northeast-2"
+
+# Restrict to your own IP, e.g. "1.2.3.4/32" — never 0.0.0.0/0.
+ssh_allowed_cidr = "<YOUR_IP>/32"

@@ -16,8 +16,8 @@ data "aws_ami" "al2023" {
 resource "aws_instance" "app" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = [aws_security_group.app.id]
+  subnet_id              = data.terraform_remote_state.base.outputs.public_subnet_id
+  vpc_security_group_ids = [data.terraform_remote_state.base.outputs.app_sg_id]
   key_name               = var.ssh_key_name
   iam_instance_profile   = aws_iam_instance_profile.app.name
 
@@ -35,8 +35,12 @@ resource "aws_instance" "app" {
     usermod -aG docker ec2-user
   EOF
 
+  # 참고용 태그 — 실제 연결 정보는 2_storage layer의 terraform output으로 확인
   tags = {
-    Name = "${var.project_name}-app"
+    Name          = "${var.project_name}-app"
+    RdsEndpoint   = data.terraform_remote_state.storage.outputs.rds_endpoint
+    RedisEndpoint = data.terraform_remote_state.storage.outputs.redis_endpoint
+    S3Bucket      = data.terraform_remote_state.storage.outputs.s3_bucket_name
   }
 }
 

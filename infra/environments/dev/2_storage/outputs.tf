@@ -1,8 +1,3 @@
-output "ec2_public_ip" {
-  description = "Elastic IP address of the app EC2 instance"
-  value       = aws_eip.app.public_ip
-}
-
 output "rds_endpoint" {
   description = "Connection endpoint for the RDS MySQL instance"
   value       = aws_db_instance.main.endpoint
@@ -26,4 +21,9 @@ output "redis_port" {
 output "s3_bucket_name" {
   description = "Name of the S3 bucket used for recordings/TTS audio"
   value       = aws_s3_bucket.recordings.bucket
+}
+
+output "s3_bucket_arn" {
+  description = "ARN of the S3 bucket used for recordings/TTS audio"
+  value       = aws_s3_bucket.recordings.arn
 }

@@ -1,3 +1,6 @@
+# 1_base — VPC, 서브넷, 라우팅, 보안그룹
+# 의존성 없음 (최상위 레이어)
+
 terraform {
   required_version = ">= 1.5.0"
 
@@ -6,10 +9,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.6"
-    }
+  }
+
+  backend "local" {
+    path = "terraform.tfstate"
   }
 }
 

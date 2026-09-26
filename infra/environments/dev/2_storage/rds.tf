@@ -1,6 +1,6 @@
 resource "aws_db_subnet_group" "main" {
   name       = "${var.project_name}-rds-subnet-group"
-  subnet_ids = [aws_subnet.private_a.id, aws_subnet.private_b.id]
+  subnet_ids = data.terraform_remote_state.base.outputs.private_subnet_ids
 
   tags = {
     Name = "${var.project_name}-rds-subnet-group"
@@ -22,7 +22,7 @@ resource "aws_db_instance" "main" {
   manage_master_user_password = true
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
-  vpc_security_group_ids = [aws_security_group.rds.id]
+  vpc_security_group_ids = [data.terraform_remote_state.base.outputs.rds_sg_id]
   multi_az               = false
 
   skip_final_snapshot = true

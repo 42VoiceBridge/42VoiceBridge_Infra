@@ -1,6 +1,6 @@
 resource "aws_elasticache_subnet_group" "main" {
   name       = "${var.project_name}-redis-subnet-group"
-  subnet_ids = [aws_subnet.private_a.id, aws_subnet.private_b.id]
+  subnet_ids = data.terraform_remote_state.base.outputs.private_subnet_ids
 }
 
 resource "aws_elasticache_cluster" "main" {
@@ -11,7 +11,7 @@ resource "aws_elasticache_cluster" "main" {
   num_cache_nodes    = 1
   port               = 6379
   subnet_group_name  = aws_elasticache_subnet_group.main.name
-  security_group_ids = [aws_security_group.redis.id]
+  security_group_ids = [data.terraform_remote_state.base.outputs.redis_sg_id]
 
   tags = {
     Name = "${var.project_name}-redis"
