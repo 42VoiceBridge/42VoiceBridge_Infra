@@ -6,6 +6,8 @@ EC2(앱) + RDS MySQL + ElastiCache Redis + S3(녹음/TTS 오디오)로 구성된
 
 > 실제 애플리케이션이 필요로 하는 환경변수 전체 목록과 "이 값을 어디서
 > 가져오는지"는 [42VoiceBridge_BE의 `docs/DEPLOYMENT.md`](https://github.com/42VoiceBridge/42VoiceBridge_BE/blob/develop/docs/DEPLOYMENT.md)를 참고하세요.
+>
+> English version: [`docs/GUIDE.md`](../docs/GUIDE.md)
 
 ## ⚠️ 반드시 읽으세요: 비용 경고
 
