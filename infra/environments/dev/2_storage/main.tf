@@ -2,7 +2,7 @@
 # 의존성: 1_base (프라이빗 서브넷 ID, rds-sg/redis-sg ID)
 
 terraform {
-  required_version = ">= 1.5.0"
+  required_version = ">= 1.10.0"
 
   required_providers {
     aws = {
@@ -15,8 +15,11 @@ terraform {
     }
   }
 
-  backend "local" {
-    path = "terraform.tfstate"
+  backend "s3" {
+    bucket       = "42voicebridge-tfstate"
+    key          = "dev/2_storage/terraform.tfstate"
+    region       = "ap-northeast-2"
+    use_lockfile = true
   }
 }
 
@@ -25,8 +28,10 @@ provider "aws" {
 }
 
 data "terraform_remote_state" "base" {
-  backend = "local"
+  backend = "s3"
   config = {
-    path = "../1_base/terraform.tfstate"
+    bucket = "42voicebridge-tfstate"
+    key    = "dev/1_base/terraform.tfstate"
+    region = "ap-northeast-2"
   }
 }

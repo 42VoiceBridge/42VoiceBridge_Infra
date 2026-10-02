@@ -7,6 +7,8 @@ EC2(앱) + RDS MySQL + ElastiCache Redis + S3(녹음/TTS 오디오)로 구성된
 > 실제 애플리케이션이 필요로 하는 환경변수 전체 목록과 "이 값을 어디서
 > 가져오는지"는 [42VoiceBridge_BE의 `docs/DEPLOYMENT.md`](https://github.com/42VoiceBridge/42VoiceBridge_BE/blob/develop/docs/DEPLOYMENT.md)를 참고하세요.
 
+> CD용 AWS 콘솔 설정과 배포 결정은 [CD 준비 상태](DEPLOYMENT-SETUP.md) 및 [ADR 목록](adr/README.md)에 기록합니다. 아래 Terraform 명령은 현재 코드의 **S3 state 방식** 기준입니다.
+
 ## ⚠️ 반드시 읽으세요: 비용 경고
 
 이 구성은 **서울 리전 기준 24/7 가동 시 시간당 약 $0.61, 월 약 $445**가
@@ -40,7 +42,7 @@ graph TB
     end
 
     subgraph L4["4_exposure — 아직 없음"]
-        CICD["GitHub Actions OIDC<br/>(자동배포 붙일 때 추가 예정)"]
+        CICD["GitHub Actions CD<br/>(자동배포 붙일 때 추가 예정)"]
     end
 
     L1 -- "private_subnet_ids<br/>rds_sg_id, redis_sg_id" --> L2
@@ -56,9 +58,13 @@ environments/dev/
 └── 3_application/   # EC2, Elastic IP, IAM Role/Policy/Instance Profile
 ```
 
-레이어마다 `terraform.tfstate`를 로컬에 독립적으로 가지며, 상위 레이어는
-하위 레이어의 상태를 `data "terraform_remote_state"`로 읽어 값을 가져옵니다
-(`backend = "local"`, `path = "../N_레이어/terraform.tfstate"`).
+세 레이어는 `42voicebridge-tfstate` 버킷의 `dev/1_base/terraform.tfstate`,
+`dev/2_storage/terraform.tfstate`, `dev/3_application/terraform.tfstate`에
+각각 state를 보관합니다. `use_lockfile = true`로 동시 변경을 막습니다.
+이 잠금 설정에는 Terraform 1.10 이상이 필요합니다.
+상위 레이어는 하위 레이어의 S3 state를 `terraform_remote_state`로 읽습니다.
+처음 `terraform init`은 backend 연결을 설정할 뿐 state 객체나 유료 인프라를
+생성하지 않습니다. 해당 레이어의 첫 `apply` 후 state 객체가 생깁니다.
 
 - **1_base**: 의존성 없음 (최상위 레이어). SG 3개(app-sg, rds-sg, redis-sg)를
   전부 여기 둔 이유는 rds-sg/redis-sg가 app-sg를 참조해야 하는데, 이 셋이
@@ -94,7 +100,10 @@ RDS/Redis 엔드포인트는 그걸 실제로 만든 2_storage의 output을 그�
      **`0.0.0.0/0` 금지.**
    - `3_application`의 `ssh_key_name`: 위에서 만든 키 페어 이름.
 
-3. AWS 자격증명이 설정되어 있어야 합니다 (`aws configure` 또는 환경변수).
+3. 로컬에서 Terraform을 실행한다면 AWS 자격증명이 설정되어 있어야 합니다
+   (`aws configure` 또는 환경변수). GitHub Actions Secrets의 키는 로컬 터미널에
+   자동으로 전달되지 않습니다. Infra 저장소 Actions의 `CD preflight (no deployment)`를
+   수동 실행하면 등록된 Secrets로 S3 backend 연결을 먼저 점검할 수 있습니다.
 
 ## 실행 순서 (반드시 아래 순서대로)
 
@@ -102,18 +111,18 @@ RDS/Redis 엔드포인트는 그걸 실제로 만든 2_storage의 output을 그�
 참조하므로 순서를 건너뛰면 `terraform_remote_state` 조회가 실패합니다.
 
 ```bash
-cd environments/dev/1_base
-terraform init
+cd infra/environments/dev/1_base
+terraform init -reconfigure
 terraform plan
 terraform apply
 
 cd ../2_storage
-terraform init
+terraform init -reconfigure
 terraform plan
 terraform apply
 
 cd ../3_application
-terraform init
+terraform init -reconfigure
 terraform plan
 terraform apply
 ```
