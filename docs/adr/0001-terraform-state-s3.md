@@ -2,7 +2,7 @@
 
 - 날짜: 2026-10-02
 - 상태: Accepted
-- 구현 상태: 버킷 생성 완료. S3 backend, 레이어 간 remote state 참조, S3 잠금 파일 설정 완료. AWS 연결 점검 전.
+- 구현 상태: 버킷 생성 완료. S3 backend, 레이어 간 remote state 참조, S3 잠금 파일 설정 완료. GitHub Actions에서 세 레이어 초기화·검증 성공.
 
 ## 배경
 

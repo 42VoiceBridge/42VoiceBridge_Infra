@@ -2,7 +2,7 @@
 
 - 날짜: 2026-10-02
 - 상태: Accepted
-- 구현 상태: `github-deploy-user` 생성 및 AWS 관리형 정책 연결 확인. 운영자 확인으로 액세스 키의 Infra Actions Secrets 등록 완료. 준비 점검 워크플로에 AWS 인증 연결, 실제 실행 결과 확인 전. 권한 축소는 초기 CD 동작 확인 후 진행할 후속 작업.
+- 구현 상태: `github-deploy-user` 생성 및 AWS 관리형 정책 연결 확인. 운영자 확인으로 액세스 키의 Infra Actions Secrets 등록 완료. 준비 점검 워크플로에서 AWS 인증 성공. 권한 축소는 초기 CD 동작 확인 후 진행할 후속 작업.
 
 ## 배경
 

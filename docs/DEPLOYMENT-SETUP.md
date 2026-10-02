@@ -1,6 +1,6 @@
 # CD 준비 상태와 수동 설정
 
-2026-10-02 기준. AWS 콘솔 설정은 운영자가 제공한 내용과 IAM 권한 화면을 기준으로 기록했다. 이 저장소에서 AWS 계정에 직접 접속해 검증한 기록은 아니다.
+2026-10-02 기준. AWS 콘솔 설정은 운영자가 제공한 내용과 IAM 권한 화면을 기준으로 기록했다. 준비 점검 워크플로에서 AWS 인증과 S3 backend 연결을 확인했다.
 
 ## 현재 확인된 설정
 
@@ -11,8 +11,8 @@
 | 버킷 리전 | 운영자 콘솔 확인: Asia Pacific (Seoul), `ap-northeast-2` |
 | IAM 사용자 | `github-deploy-user`에 아래 정책 7개가 직접 연결된 화면 확인 |
 | AWS 배포 액세스 키 | 운영자 확인: `github-deploy-user`에서 발급해 Infra 저장소 Actions Secrets에 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`로 등록 완료. 값 자체는 이 저장소에서 확인하지 않음 |
-| Terraform 코드 | 세 레이어의 S3 backend, 서로 다른 state key, S3 잠금 파일 및 상위 레이어의 S3 `terraform_remote_state` 설정 완료. 운영자 확인: 기존 로컬 state 없음. AWS에서 실제 `terraform init` 실행 결과는 아직 확인 전 |
-| CD 워크플로 | `.github/workflows/cd-preflight.yml`에 수동 실행과 BE `deploy-backend` 이벤트를 받는 준비 점검 추가. AWS 인증·버킷 리전·S3 backend 초기화·Terraform 검증만 수행하며 `apply`와 앱 배포는 아직 구현되지 않음. BE `main` 연동도 아직 미구현 |
+| Terraform 코드 | 세 레이어의 S3 backend, 서로 다른 state key, S3 잠금 파일 및 상위 레이어의 S3 `terraform_remote_state` 설정 완료. 운영자 확인: 기존 로컬 state 없음. GitHub Actions에서 세 레이어의 `terraform init`·`validate` 성공 |
+| CD 워크플로 | `.github/workflows/cd-preflight.yml`에 수동 실행과 BE `deploy-backend` 이벤트를 받는 준비 점검 추가. AWS 인증·버킷 리전·S3 backend 초기화·Terraform 검증 성공. `apply`와 앱 배포는 아직 구현되지 않았고 BE `main` 연동도 미구현 |
 
 IAM 사용자에 직접 연결된 정책:
 
@@ -36,12 +36,12 @@ IAM 사용자에 직접 연결된 정책:
 - [ADR 0002](adr/0002-main-branch-cd.md): BE `main` 푸시와 이미 검증된 GHCR 이미지를 배포 흐름에 사용한다.
 - [ADR 0003](adr/0003-github-deploy-identity.md): 전용 IAM 사용자의 AWS 키를 CD에 사용하되, 현재의 전체 접근 정책을 배포용 권한으로 축소한다.
 
-이 ADR들은 설계 결정을 기록한다. Terraform S3 backend는 코드에 반영됐지만 AWS에서 초기화 결과는 아직 확인하지 않았다. IAM 권한 축소, BE 워크플로, SSM 배포는 아직 코드에 반영되지 않았다. Infra에는 배포 전 준비 점검 워크플로가 있다.
+이 ADR들은 설계 결정을 기록한다. Terraform S3 backend는 코드에 반영됐고 [GitHub Actions 준비 점검](https://github.com/42VoiceBridge/42VoiceBridge_Infra/actions/runs/36981904406)에서 AWS 인증, 버킷 리전, 세 레이어 초기화·검증이 성공했다. IAM 권한 축소, BE 워크플로, SSM 배포는 아직 코드에 반영되지 않았다.
 
 ## 다음 작업 순서
 
 1. 콘솔에서 `42voicebridge-tfstate`의 버전 관리와 퍼블릭 액세스 차단을 다시 확인한다. 리전은 운영자 확인에 따라 `ap-northeast-2`로 설정했다. state 버킷은 `2_storage`의 녹음/TTS 버킷과 별개이며 앱 자원보다 오래 유지한다.
-2. Infra 저장소의 Actions에서 `CD preflight (no deployment)`를 수동 실행해 AWS 인증과 세 S3 backend 초기화를 확인한다. state key 경로는 `dev/1_base/terraform.tfstate`, `dev/2_storage/terraform.tfstate`, `dev/3_application/terraform.tfstate`다. 기존 로컬 state가 없다고 확인됐으므로 migration은 하지 않는다. 첫 `apply` 전에는 S3에 state 객체가 없어도 정상이다.
+2. 필요할 때 Infra 저장소의 Actions에서 `CD preflight (no deployment)`를 재실행한다. state key 경로는 `dev/1_base/terraform.tfstate`, `dev/2_storage/terraform.tfstate`, `dev/3_application/terraform.tfstate`다. 기존 로컬 state가 없다고 확인됐으므로 migration은 하지 않는다. 첫 `apply` 전에는 S3에 state 객체가 없어도 정상이다.
 3. EC2 역할에 SSM 관리 권한을 붙이고 배포 방식에 따라 현재 Terraform의 SSH 키 페어·22번 포트 요구사항을 정리한다. SSM 방식으로 확정하기 전에는 기존 SSH 설정을 그대로 취급한다.
 4. BE 저장소에서 `main` 이미지 게시 성공 후 Infra 저장소의 CD 워크플로를 호출한다. BE에는 Infra 저장소의 `repository_dispatch`를 호출할 GitHub 토큰이 필요하다. Infra 워크플로가 `1_base → 2_storage → 3_application` 순서로 적용하고, 전달받은 BE 커밋의 GHCR 이미지로 배포한다. GHCR 패키지가 비공개라면 EC2의 이미지 읽기 인증도 준비한다.
 5. **후속 작업:** CD 동작 확인 후 `github-deploy-user` 정책을 state 버킷, 프로젝트 리소스, 앱 EC2 역할의 `iam:PassRole`, 대상 EC2의 SSM 명령 범위로 축소한다. `IAMUserChangePassword`가 불필요하다면 제거한다. OIDC 전환 시 액세스 키를 비활성화·삭제한다.
