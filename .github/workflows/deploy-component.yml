@@ -1,0 +1,95 @@
+name: Deploy one component (reusable)
+
+# BE/AI/FE 이벤트 워크플로(deploy-backend, deploy-ai, deploy-frontend)가 호출하는 공통 배포 절차.
+# 순서: payload 형식 검증 → 소스 레포 main 포함 여부 확인 → 락 획득 → 해당 인스턴스에만 SSM 배포 → 락 해제.
+# 락은 Terraform apply(인스턴스 교체)와 배포가 겹치지 않게 한다(scripts/ci/infra-lock.sh).
+'on':
+  workflow_call:
+    inputs:
+      component:
+        description: be, ai or fe
+        required: true
+        type: string
+      source_repository:
+        description: Source repository whose main branch must contain the commit (owner/name)
+        required: true
+        type: string
+      image_repository:
+        description: Value of the Infra repository variable *_IMAGE_REPOSITORY (ghcr.io/42voicebridge/<package>)
+        required: true
+        type: string
+      ref:
+        description: client_payload.ref
+        required: false
+        type: string
+        default: ''
+      sha:
+        description: client_payload.sha
+        required: false
+        type: string
+        default: ''
+      payload_image:
+        description: client_payload.image (optional; only compared, never deployed)
+        required: false
+        type: string
+        default: ''
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # 락 대기(최대 40분) + AI 배포(최대 30분)를 감안한 상한.
+    timeout-minutes: 90
+    env:
+      AWS_REGION: ap-northeast-2
+      TF_IN_AUTOMATION: 'true'
+      # 이벤트 값은 env로만 전달한다(스크립트에 ${{ }}를 직접 넣지 않는다).
+      COMPONENT: ${{ inputs.component }}
+      SOURCE_REPOSITORY: ${{ inputs.source_repository }}
+      IMAGE_REPOSITORY: ${{ inputs.image_repository }}
+      DISPATCH_REF: ${{ inputs.ref }}
+      DISPATCH_SHA: ${{ inputs.sha }}
+      DISPATCH_IMAGE: ${{ inputs.payload_image }}
+      COMPONENT_LABEL: ${{ inputs.component }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate dispatch payload (format only)
+        run: bash scripts/ci/validate-dispatch.sh
+
+      - name: Verify the commit is on the source repository main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash scripts/ci/verify-source-commit.sh "$SOURCE_REPOSITORY" "$DISPATCH_SHA"
+
+      - uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: 1.15.3
+          terraform_wrapper: false
+
+      - name: Acquire infra lock (waits while Terraform apply is running)
+        id: lock
+        run: bash scripts/ci/infra-lock.sh acquire deploy "$COMPONENT" "$GITHUB_RUN_ID"
+
+      - name: Deploy to the component instance through SSM
+        run: bash scripts/ci/deploy-component.sh "$COMPONENT" "$DISPATCH_SHA"
+
+      # 락을 실제로 획득한 경우에만 해제한다(획득하지 못한 실행이 다른 실행의 락을 지우지 않도록).
+      - name: Release infra lock
+        if: always() && steps.lock.outcome == 'success'
+        run: bash scripts/ci/infra-lock.sh release deploy "$COMPONENT"

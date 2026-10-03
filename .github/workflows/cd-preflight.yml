@@ -1,9 +1,9 @@
 name: CD preflight (no deployment)
 
+# 배포 이벤트(deploy-backend, deploy-ai, deploy-frontend)는 각각 deploy-*.yml이 받는다.
+# 이 워크플로는 수동으로 AWS 접근과 Terraform 구성을 점검하며 배포하지 않는다.
 'on':
   workflow_dispatch:
-  repository_dispatch:
-    types: [deploy-backend]
 
 permissions:
   contents: read
@@ -20,24 +20,8 @@ jobs:
     env:
       AWS_REGION: ap-northeast-2
       TF_IN_AUTOMATION: "true"
-      BE_REF: ${{ github.event.client_payload.ref }}
-      BE_SHA: ${{ github.event.client_payload.sha }}
 
     steps:
-      - name: Check backend dispatch payload
-        if: github.event_name == 'repository_dispatch'
-        shell: bash
-        run: |
-          if [[ "$BE_REF" != "refs/heads/main" ]]; then
-            echo "::error::Backend dispatch must come from main (refs/heads/main)."
-            exit 1
-          fi
-          if [[ ! "$BE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Backend dispatch must include a 40-character commit SHA."
-            exit 1
-          fi
-          echo "Backend commit: $BE_SHA"
-
       - name: Check out Infra repository
         uses: actions/checkout@v7.0.1
         with:

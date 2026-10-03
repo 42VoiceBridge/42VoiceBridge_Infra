@@ -1,0 +1,73 @@
+name: Infra tests (offline)
+
+# AWS 자격 증명 없이 실행되는 검사만 모은다: shellcheck, 스크립트 동작 테스트(스텁), 워크플로 구조·안전 규칙,
+# Terraform 포맷·validate·mock 프로바이더 테스트. 배포나 apply는 하지 않는다.
+'on':
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'infra/**'
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'infra/**'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: shellcheck
+        run: |
+          shellcheck -x scripts/ssm/*.sh scripts/ssm/test/*.sh scripts/ci/*.sh scripts/ci/test/*.sh \
+            infra/environments/dev/3_application/tests/*.sh
+
+      - name: EC2 deploy script tests (stubbed docker/aws)
+        run: bash scripts/ssm/test/deploy-ec2.test.sh
+
+      - name: run.sh flow tests (stubbed terraform/aws)
+        run: bash scripts/ssm/test/run.test.sh
+
+      - name: Dispatch validation, source verification, component mapping tests
+        run: bash scripts/ci/test/validate-and-verify.test.sh
+
+      - name: Infra lock tests (apply vs deploy mutual exclusion)
+        run: bash scripts/ci/test/infra-lock.test.sh
+
+      - name: Layered terraform plan/apply tests
+        run: bash scripts/ci/test/tf-layer.test.sh
+
+      - name: Workflow structure and safety tests
+        run: bash scripts/ci/test/workflows.test.sh
+
+      - name: user_data mount logic tests
+        run: bash infra/environments/dev/3_application/tests/user_data_mount.test.sh
+
+      - uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: 1.15.3
+          terraform_wrapper: false
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive infra/environments/dev
+
+      - name: Validate and mock-test every layer
+        run: |
+          for layer in 1_base 2_storage 3_application; do
+            echo "== $layer"
+            terraform -chdir="infra/environments/dev/$layer" init -backend=false -lockfile=readonly -input=false
+            terraform -chdir="infra/environments/dev/$layer" validate -no-color
+            if [[ -d "infra/environments/dev/$layer/tests" ]]; then
+              terraform -chdir="infra/environments/dev/$layer" test -no-color
+            fi
+          done

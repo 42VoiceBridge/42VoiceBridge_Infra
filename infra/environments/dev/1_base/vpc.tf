@@ -20,7 +20,7 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
-# Public subnet — hosts the EC2 app server
+# Public subnet — hosts the FE, BE and AI instances (no NAT, so all need the IGW)
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"

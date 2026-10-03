@@ -1,3 +1,5 @@
+# FE·BE·AI 3대 공통 요소. 인스턴스별 정의는 be.tf, ai.tf, fe.tf에 있다.
+
 data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["amazon"]
@@ -13,56 +15,16 @@ data "aws_ami" "al2023" {
   }
 }
 
-resource "aws_instance" "app" {
-  ami                    = data.aws_ami.al2023.id
-  instance_type          = var.instance_type
-  subnet_id              = data.terraform_remote_state.base.outputs.public_subnet_id
-  vpc_security_group_ids = [data.terraform_remote_state.base.outputs.app_sg_id]
-  key_name               = var.ssh_key_name
-  iam_instance_profile   = aws_iam_instance_profile.app.name
-
-  # Containers need two hops to receive IMDSv2 token responses.
-  metadata_options {
-    http_endpoint               = "enabled"
-    http_tokens                 = "required"
-    http_put_response_hop_limit = 2
-  }
-
-  root_block_device {
-    volume_type = "gp3"
-    volume_size = 30
-  }
-
-  user_data = <<-EOF
-    #!/bin/bash
-    dnf update -y
-    dnf install -y docker jq curl
-    systemctl enable docker
-    systemctl start docker
-    systemctl enable --now amazon-ssm-agent
-    usermod -aG docker ec2-user
-  EOF
-
-  # 참고용 태그 — 실제 연결 정보는 2_storage layer의 terraform output으로 확인
-  tags = {
-    Name          = "${var.project_name}-app"
-    RdsEndpoint   = data.terraform_remote_state.storage.outputs.rds_endpoint
-    RedisEndpoint = data.terraform_remote_state.storage.outputs.redis_endpoint
-    S3Bucket      = data.terraform_remote_state.storage.outputs.s3_bucket_name
-  }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.app_ssm,
-    aws_iam_role_policy.secrets_access,
-    aws_iam_role_policy.s3_access,
-  ]
+# 프라이빗 서브넷에는 NAT가 없어 GHCR pull, Hugging Face 다운로드, SSM 연결이 불가능하므로
+# 세 인스턴스 모두 퍼블릭 서브넷에 둔다. 인바운드는 보안그룹으로 통제한다.
+# 볼륨 AZ와 고정 사설 IP 검증도 이 서브넷 정보를 쓴다.
+data "aws_subnet" "app" {
+  id = data.terraform_remote_state.base.outputs.public_subnet_id
 }
 
-resource "aws_eip" "app" {
-  instance = aws_instance.app.id
-  domain   = "vpc"
+locals {
+  subnet_id = data.terraform_remote_state.base.outputs.public_subnet_id
 
-  tags = {
-    Name = "${var.project_name}-app-eip"
-  }
+  # 퍼블릭 서브넷은 /24이므로 앞 3옥텟(예: "10.0.1.")이 같으면 같은 서브넷 안의 주소다.
+  subnet_prefix = "${join(".", slice(split(".", cidrhost(data.aws_subnet.app.cidr_block, 0)), 0, 3))}."
 }

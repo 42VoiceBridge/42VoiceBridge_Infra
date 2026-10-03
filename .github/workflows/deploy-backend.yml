@@ -1,0 +1,29 @@
+name: Deploy BE image (repository_dispatch)
+
+# BE 저장소 CI가 이미지를 GHCR에 게시한 뒤 보내는 deploy-backend 이벤트를 받아 해당 인스턴스의 컨테이너만 교체한다.
+# repository_dispatch는 기본 브랜치(main)의 워크플로만 실행한다. 이벤트 값 검증과 배포 절차는
+# deploy-component.yml(재사용 워크플로)에 있다. 이미지 경로는 payload가 아니라 Infra 변수 BE_IMAGE_REPOSITORY와 SHA로만 조립한다.
+'on':
+  repository_dispatch:
+    types: [deploy-backend]
+
+permissions:
+  contents: read
+
+# 같은 컴포넌트의 이벤트는 직렬화한다. 대기 중인 이전 이벤트는 더 최신 이벤트로 대체된다(최신 이미지 우선).
+# apply와의 상호 배제는 락 스크립트가 맡는다(concurrency는 대기 1개만 유지해 다른 컴포넌트 배포를 취소할 수 있다).
+concurrency:
+  group: deploy-be
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-component.yml
+    with:
+      component: be
+      source_repository: 42VoiceBridge/42VoiceBridge_BE
+      image_repository: ${{ vars.BE_IMAGE_REPOSITORY }}
+      ref: ${{ github.event.client_payload.ref }}
+      sha: ${{ github.event.client_payload.sha }}
+      payload_image: ${{ github.event.client_payload.image }}
+    secrets: inherit

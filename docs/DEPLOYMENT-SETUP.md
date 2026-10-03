@@ -34,9 +34,10 @@ IAM 사용자에 직접 연결된 정책:
 ## 결정과 코드의 상태
 
 - [ADR 0001](adr/0001-terraform-state-s3.md): 앱 리소스와 분리한 S3 버킷에 Terraform state를 보관한다.
-- [ADR 0002](adr/0002-main-branch-cd.md): BE `main` 푸시와 이미 검증된 GHCR 이미지를 배포 흐름에 사용한다.
+- [ADR 0002](adr/0002-main-branch-cd.md): BE·AI·FE `main` 푸시와 이미 검증된 GHCR 이미지를 배포 흐름에 사용한다.
+- [ADR 0006](adr/0006-three-instance-topology.md): FE·BE·AI를 개별 인스턴스로 분리한다(ADR 0005 대체). 코드 구현·오프라인 검증 완료, AWS 적용 전.
 - [ADR 0003](adr/0003-github-deploy-identity.md): 전용 IAM 사용자의 AWS 키를 CD에 사용하되, 현재의 전체 접근 정책을 배포용 권한으로 축소한다.
-- [ADR 0004](adr/0004-ec2-access-method.md): SSH와 SSM 중 앱 EC2의 최종 접속·배포 방식은 보류한다. SSM 구현·검증 후 확정한다.
+- [ADR 0004](adr/0004-ec2-access-method.md): SSH와 SSM 중 최종 접속·배포 방식은 보류한다(SSH는 BE에만 남김). SSM 구현·검증 후 확정한다.
 
 Terraform S3 backend는 코드에 반영됐고 [GitHub Actions 준비 점검](https://github.com/42VoiceBridge/42VoiceBridge_Infra/actions/runs/36981904406)에서 AWS 인증, 버킷 리전, 세 레이어 초기화·검증이 성공했다. SSM 수동 배포 경로는 코드로 구현했지만 아직 `apply`·실제 배포 검증 전이다. IAM 권한 축소와 BE 자동 연동도 남았다. [SSM 배포 절차](SSM-DEPLOYMENT.md)를 참고한다.
 
@@ -47,8 +48,8 @@ Terraform S3 backend는 코드에 반영됐고 [GitHub Actions 준비 점검](ht
 1. 콘솔에서 `42voicebridge-tfstate`의 버전 관리와 퍼블릭 액세스 차단을 다시 확인한다. 리전은 운영자 확인에 따라 `ap-northeast-2`로 설정했다. state 버킷은 `2_storage`의 녹음/TTS 버킷과 별개이며 앱 자원보다 오래 유지한다.
 2. 필요할 때 Infra 저장소의 Actions에서 `CD preflight (no deployment)`를 재실행한다. state key 경로는 `dev/1_base/terraform.tfstate`, `dev/2_storage/terraform.tfstate`, `dev/3_application/terraform.tfstate`다. 기존 로컬 state가 없다고 확인됐으므로 migration은 하지 않는다. 첫 `apply` 전에는 S3에 state 객체가 없어도 정상이다.
 3. 앱 시크릿 이름·필드명, GHCR 공개 여부, RDS 초기 스키마를 확인한다. EC2 역할의 SSM 관리 권한은 Terraform 코드에 추가됐지만 실제 적용과 연결 검증은 남았다. 현재 SSH 키 페어·22번 포트 요구사항은 유지한다.
-4. 비용과 입력값 확인 후 `1_base → 2_storage → 3_application` 순서로 수동 `plan`·`apply`하고 SSM `check`와 BE SHA 수동 배포를 검증한다. 그다음 Terraform 적용 자동화와 BE `main`의 `repository_dispatch` 호출을 구현한다. BE에는 Infra 저장소 호출용 GitHub 토큰이 필요하다.
-5. **후속 작업:** CD 동작 확인 후 `github-deploy-user` 정책을 state 버킷, 프로젝트 리소스, 앱 EC2 역할의 `iam:PassRole`, 대상 EC2의 SSM 명령 범위로 축소한다. `IAMUserChangePassword`가 불필요하다면 제거한다. OIDC 전환 시 액세스 키를 비활성화·삭제한다.
+4. 비용(추정치)과 입력값 확인 후 **레이어별로** `Terraform plan (one layer)` → 검토 → `Terraform apply (one layer, saved plan)`을 `1_base → 2_storage → 3_application` 순서로 실행하고(첫 배포는 한 번에 전체 plan 불가) SSM `check`와 컴포넌트별 수동 배포를 검증한다. 그다음 Terraform 적용 자동화와 BE `main`의 `repository_dispatch` 호출을 구현한다. BE에는 Infra 저장소 호출용 GitHub 토큰이 필요하다.
+5. **후속 작업:** CD 동작 확인 후 `github-deploy-user` 정책을 state 버킷, 프로젝트 리소스, 인스턴스 역할 3개와 DLM 역할의 `iam:PassRole`, 대상 인스턴스의 SSM 명령 범위, 락(`locks/dev/*`)과 배포 기록(SSM Parameter `/voicebridge/dev/deployed/*`) 범위로 축소한다([후속 작업](FOLLOW-UPS.md#1-aws-키)). `IAMUserChangePassword`가 불필요하다면 제거한다. OIDC 전환 시 액세스 키를 비활성화·삭제한다.
 6. 테스트가 끝난 뒤 `3_application → 2_storage → 1_base` 순서로 종료하는 절차를 마련한다. **state 버킷은 모든 `destroy`가 끝날 때까지 삭제하지 않는다.**
 
 환경변수와 자격증명의 관리 주체·저장 위치·읽기 권한은 [배포 환경변수 명세](ENVIRONMENT-VARIABLES.md)에 정리했다. 애플리케이션 변수의 원본 설명은 [BE 배포 문서](https://github.com/42VoiceBridge/42VoiceBridge_BE/blob/develop/docs/DEPLOYMENT.md)를 따른다. 현재 인프라 실행 절차는 [GUIDE.md](GUIDE.md)를 참고한다.
