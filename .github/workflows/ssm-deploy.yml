@@ -36,6 +36,8 @@ jobs:
       DEPLOY_MODE: ${{ inputs.mode }}
       BE_SHA: ${{ inputs.be_sha }}
       AI_SHA: ${{ inputs.ai_sha }}
+      BE_IMAGE_REPOSITORY: ${{ vars.BE_IMAGE_REPOSITORY }}
+      AI_IMAGE_REPOSITORY: ${{ vars.AI_IMAGE_REPOSITORY }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:

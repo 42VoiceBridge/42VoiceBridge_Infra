@@ -45,7 +45,7 @@ check "성공" test "$rc" = 0
 check "xfs 포맷 수행" called "mkfs -t xfs"
 check "fstab에 UUID로 등록(nofail)" grep -q '^UUID=1111-2222-uuid .* xfs defaults,nofail' "$T/fstab"
 check "마운트 수행" called "mount "
-check "ai/hf, ai/adapters 생성" test -d "$T/data/ai/hf" -a -d "$T/data/ai/adapters"
+check "ai/hf, adapters, enroll, jobs 생성" test -d "$T/data/ai/hf" -a -d "$T/data/ai/adapters" -a -d "$T/data/ai/enroll" -a -d "$T/data/ai/jobs"
 
 echo "기존 데이터가 있는 볼륨(blkid -p 종료코드 0)"
 run_case 1 0

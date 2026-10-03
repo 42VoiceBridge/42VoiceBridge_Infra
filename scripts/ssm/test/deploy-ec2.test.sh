@@ -159,7 +159,10 @@ check "호스트 /data/ai를 컨테이너 /data로 마운트" log_has "--volume 
 check "HF_HOME=/data/hf 지정" log_has "HF_HOME=/data/hf"
 check "로그 순환 옵션" log_has "max-size=10m"
 check "AI 컨테이너 존재" container_exists voicebridge-ai
-check "hf/adapters 디렉터리 생성" test -d "$work/data/ai/hf" -a -d "$work/data/ai/adapters"
+check "hf/adapters/enroll/jobs 디렉터리 생성" test -d "$work/data/ai/hf" -a -d "$work/data/ai/adapters" -a -d "$work/data/ai/enroll" -a -d "$work/data/ai/jobs"
+check "마운트 최상위 /data/ai도 컨테이너 사용자 소유(앱이 enroll·jobs를 직접 생성)" grep -Fq "chown 1000:1000 $work/data/ai" "$STUB_STATE/chown.log"
+check "enroll·jobs도 chown 대상" grep -Fq "$work/data/ai/jobs" "$STUB_STATE/chown.log"
+check "CPU 학습 허용(ALLOW_CPU_TRAIN=1)" log_has "ALLOW_CPU_TRAIN=1"
 check "S3의 프롬프트 풀이 설치됨" test "$(cat "$work/data/ai/script_pool.json" 2>/dev/null)" = '{"prompts":["a"]}'
 check "컨테이너 사용자(1000:1000)로 chown" grep -Fq "1000:1000" "$STUB_STATE/chown.log"
 check "BE 컨테이너는 건드리지 않음" container_absent voicebridge-be

@@ -8,6 +8,12 @@ region=${AWS_REGION:-ap-northeast-2}
 application_dir=infra/environments/dev/3_application
 storage_dir=infra/environments/dev/2_storage
 
+# 이미지 저장소 경로는 Infra 저장소 Variables(BE_IMAGE_REPOSITORY, AI_IMAGE_REPOSITORY)에서 받는다.
+# 비어 있으면 기본 이름을 쓴다. 이벤트 payload의 이미지 경로는 신뢰하지 않고 SHA만 쓴다.
+be_repo=${BE_IMAGE_REPOSITORY:-ghcr.io/42voicebridge/42voicebridge_be}
+ai_repo=${AI_IMAGE_REPOSITORY:-ghcr.io/42voicebridge/42voicebridge_ai}
+repo_pattern='^ghcr\.io/42voicebridge/[a-z0-9._-]+$'
+
 usage() {
   echo "Usage: $0 check|deploy [BE 40-character commit SHA] [AI 40-character commit SHA]" >&2
   exit 2
@@ -28,6 +34,13 @@ if [[ "$mode" == deploy ]]; then
     fi
   done
 fi
+
+for repo in "$be_repo" "$ai_repo"; do
+  if [[ ! "$repo" =~ $repo_pattern ]]; then
+    echo "Image repository must look like ghcr.io/42voicebridge/<package>: $repo" >&2
+    exit 2
+  fi
+done
 
 terraform -chdir="$application_dir" init -reconfigure -lockfile=readonly -input=false -no-color >/dev/null
 instance_id=$(terraform -chdir="$application_dir" output -raw ec2_instance_id)
@@ -134,7 +147,7 @@ write_deploy_parameters() {
 # AI를 먼저 배포한다. AI가 실패하면 BE는 건드리지 않는다.
 # AI 타임아웃 1800초: 큰 이미지 pull + 모델 다운로드/로딩 대기(최대 600초) + 여유.
 if [[ -n "$ai_sha" ]]; then
-  write_deploy_parameters 1800 ai "ghcr.io/42voicebridge/42voicebridge_ai:sha-$ai_sha" \
+  write_deploy_parameters 1800 ai "$ai_repo:sha-$ai_sha" \
     "$region" "$app_secret_name" "$app_bucket"
   run_ssm_command deploy-ai 1800
 fi
@@ -146,7 +159,7 @@ if [[ -n "$be_sha" ]]; then
   redis_host=$(terraform -chdir="$storage_dir" output -raw redis_endpoint)
   redis_port=$(terraform -chdir="$storage_dir" output -raw redis_port)
 
-  write_deploy_parameters 900 be "ghcr.io/42voicebridge/42voicebridge_be:sha-$be_sha" \
+  write_deploy_parameters 900 be "$be_repo:sha-$be_sha" \
     "$region" "$app_secret_name" "$rds_secret_arn" "$rds_endpoint" "$db_name" \
     "$redis_host" "$redis_port" "$app_bucket"
   run_ssm_command deploy-be 900

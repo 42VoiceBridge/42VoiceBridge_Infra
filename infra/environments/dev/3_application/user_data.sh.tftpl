@@ -47,7 +47,7 @@ mount_data_volume() {
     echo "UUID=$uuid $mount_point xfs defaults,nofail 0 2" >>/etc/fstab
   mountpoint -q "$mount_point" || mount "$mount_point"
 
-  mkdir -p "$mount_point/ai/hf" "$mount_point/ai/adapters"
+  mkdir -p "$mount_point/ai/hf" "$mount_point/ai/adapters" "$mount_point/ai/enroll" "$mount_point/ai/jobs"
 }
 
 mount_data_volume || echo "Data volume setup FAILED; see messages above." >&2

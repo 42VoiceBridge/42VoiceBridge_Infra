@@ -220,7 +220,9 @@ prepare_ai_data() {
   local pool_local=$ai_data_dir/script_pool.json
   local pool_tmp ai_uid ai_gid
 
-  mkdir -p "$ai_data_dir/hf" "$ai_data_dir/adapters"
+  # AI 서버는 /data 아래에 enroll, jobs를 직접 만들고(비루트 uid 10001) 어댑터·캐시를 쓴다.
+  # 마운트한 최상위 디렉터리가 root 소유면 등록·학습 작업이 권한 오류로 실패하므로 같이 맞춘다.
+  mkdir -p "$ai_data_dir/hf" "$ai_data_dir/adapters" "$ai_data_dir/enroll" "$ai_data_dir/jobs"
 
   # 프롬프트 풀은 코드·이미지에 없다. 로컬에 없을 때만 S3(ai/script_pool.json)에서 가져온다.
   # 이미 있는 파일은 덮어쓰지 않는다(갱신하려면 docs/AI-DEPLOYMENT.md 참고).
@@ -246,7 +248,9 @@ prepare_ai_data() {
   # 컨테이너 사용자가 root가 아니면 쓰기 권한이 필요하다. 이미지의 실행 사용자를 조회해 맞춘다.
   if ai_uid=$(docker run --rm --network none --entrypoint id "$image" -u 2>/dev/null) \
     && ai_gid=$(docker run --rm --network none --entrypoint id "$image" -g 2>/dev/null); then
-    chown -R "$ai_uid:$ai_gid" "$ai_data_dir/hf" "$ai_data_dir/adapters"
+    chown "$ai_uid:$ai_gid" "$ai_data_dir"
+    chown -R "$ai_uid:$ai_gid" "$ai_data_dir/hf" "$ai_data_dir/adapters" \
+      "$ai_data_dir/enroll" "$ai_data_dir/jobs"
     [[ ! -f "$pool_local" ]] || chown "$ai_uid:$ai_gid" "$pool_local"
   else
     echo "WARNING: could not read the AI container user; data directories keep root ownership." >&2
@@ -292,12 +296,15 @@ case "$component" in
     docker pull "$image" >/dev/null
     prepare_ai_data
 
-    # 호스트의 /data/ai를 컨테이너의 /data로 마운트하면 AI가 기대하는 경로
-    # (/data/hf, /data/adapters, /data/script_pool.json)가 그대로 유지된다.
+    # 호스트의 /data/ai를 컨테이너의 /data로 마운트하면 AI 이미지가 기대하는 경로
+    # (/data/hf, /data/adapters, /data/enroll, /data/jobs, /data/script_pool.json)가 그대로 유지된다.
     # AI 포트는 게시하지 않는다. 로그는 디스크를 채우지 않게 순환시킨다.
+    # ALLOW_CPU_TRAIN=1: GPU 없이 CPU로 개인화 학습을 허용한다. AI팀 실측에서 CPU 학습은
+    # 17.6분(GPU 18초)이고 어댑터가 바이트 단위로 동일해 느리지만 쓸 수 있는 경로다. 이 값이
+    # 없으면 학습기가 CPU 실행을 거부한다.
     deploy_container "$ai_name" wait_ai_healthy \
       --network "$docker_network" \
-      --volume "$ai_data_dir:/data" --env HF_HOME=/data/hf \
+      --volume "$ai_data_dir:/data" --env HF_HOME=/data/hf --env ALLOW_CPU_TRAIN=1 \
       --log-opt max-size=10m --log-opt max-file=3 "$image"
     echo "Deployed $image; /v1/health returned 200."
     ;;

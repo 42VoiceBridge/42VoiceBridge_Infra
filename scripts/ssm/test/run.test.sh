@@ -88,6 +88,19 @@ check "BE만 → 명령 1개(BE)" bash -c "test '$(sends)' = 1 && grep -q 'be:sh
 run deploy "" "$AI_SHA"
 check "AI만 → 명령 1개(AI)" bash -c "test '$(sends)' = 1 && grep -q 'ai:sha-' '$STUB_STATE/sends.log'"
 
+echo "이미지 저장소 변수"
+AI_IMAGE_REPOSITORY=ghcr.io/42voicebridge/custom-ai run deploy "" "$AI_SHA"
+check "AI_IMAGE_REPOSITORY 값으로 이미지 조립" send_n_has 1 "custom-ai:sha-$AI_SHA"
+AI_IMAGE_REPOSITORY="ghcr.io/evil/x" run deploy "" "$AI_SHA"
+check "다른 조직 경로는 거부 → 2" rc_is 2
+check "거부 시 SSM 명령을 보내지 않음" test "$(sends)" = 0
+AI_IMAGE_REPOSITORY='<실제-AI-패키지명>' run deploy "" "$AI_SHA"
+check "자리 표시자 값은 거부 → 2" rc_is 2
+BE_IMAGE_REPOSITORY=ghcr.io/42voicebridge/custom-be run deploy "$BE_SHA" ""
+check "BE_IMAGE_REPOSITORY 값으로 이미지 조립" send_n_has 1 "custom-be:sha-$BE_SHA"
+AI_IMAGE_REPOSITORY="" run deploy "" "$AI_SHA"
+check "변수가 비어 있으면 기본 AI 이미지 이름" send_n_has 1 "42voicebridge_ai:sha-$AI_SHA"
+
 echo "deploy: AI 실패 시 BE 미배포"
 STUB_FAIL_AT=1 run deploy "$BE_SHA" "$AI_SHA"
 check "종료코드 1" rc_is 1
