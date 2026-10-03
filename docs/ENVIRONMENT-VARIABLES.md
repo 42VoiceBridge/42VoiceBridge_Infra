@@ -60,7 +60,15 @@ AWS 키 생성 화면의 **Access key ID**는 `AWS_ACCESS_KEY_ID`, **Secret acce
 
 ## 카카오 로그인과 AWS 키
 
-현재 BE는 클라이언트가 `/api/v1/auth/kakao`에 보낸 `kakaoAccessToken`을 카카오 사용자 정보 API에 전달한다. **BE 서버용 카카오 API 키 환경변수는 현재 없다.** 클라이언트의 카카오 앱 설정과 이 표의 서버·CD 비밀값을 혼동하지 않는다.
+**갱신(2026-10-03, BE `develop` 확인):** BE는 카카오 **인가 코드**를 서버에서 토큰으로 교환한다(`token-uri`). 그래서 서버 쪽 환경변수 `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI`를 읽는다(기본값은 빈 문자열). 이전 문서의 "BE 서버용 카카오 환경변수는 없다"는 더 이상 맞지 않는다.
+
+| 변수 | 값의 출처 | 저장 위치 / 전달 | 비고 |
+|---|---|---|---|
+| `KAKAO_CLIENT_ID` | 카카오 개발자 콘솔의 REST API 키 | 앱 시크릿 `voicebridge/dev/app` → BE 컨테이너 env-file | 선택 필드. 없으면 카카오 로그인만 동작하지 않고 배포는 성공한다(안내 출력) |
+| `KAKAO_CLIENT_SECRET` | 같은 앱의 Client secret(사용 설정한 경우) | 앱 시크릿 → env-file | 값은 출력·명령줄에 노출하지 않는다 |
+| `KAKAO_REDIRECT_URI` | **FE가 로그인을 시작할 때 쓰는 값과 같아야 한다**: `https://<FE 출처>/auth/kakao/callback` | 앱 시크릿 → env-file | FE 출처는 `terraform output fe_public_host`(도메인이 없으면 EIP 공개 DNS 이름이라 EIP를 다시 만들면 바뀐다). 카카오 콘솔에 등록한 Redirect URI와도 같아야 한다 |
+
+세 값은 FE 주소가 정해진 뒤(Terraform apply 후)에야 확정할 수 있다. 값을 앱 시크릿에 넣고 **BE를 다시 배포**해야 반영된다(BE는 시작 시점에만 읽는다). FE의 카카오 JavaScript 키(`VITE_KAKAO_JAVASCRIPT_KEY`)는 FE 이미지 빌드 변수이며 이 표의 값과 다르다. 클라이언트의 카카오 앱 설정과 이 표의 서버·CD 비밀값을 혼동하지 않는다.
 
 앱 S3 접근에는 EC2 Instance Profile을 사용한다. 따라서 **백엔드 컨테이너에 AWS 액세스 키를 주입하지 않는다.** Terraform state 버킷 `42voicebridge-tfstate` 역시 앱의 `S3_BUCKET`과 별개다.
 

@@ -65,16 +65,14 @@ AWS는 루트를 일상 작업에 사용하지 않도록 권장한다. 지금은
 
 시크릿을 만들었다고 곧바로 앱이 배포되는 것은 아니다. Terraform `1_base → 2_storage → 3_application`을 레이어별로 적용해 인스턴스 역할과 권한을 생성한 뒤, [SSM 수동 배포 절차](../SSM-DEPLOYMENT.md)의 `check`와 `deploy`를 실행한다. 기존 AWS 자원 적용 여부와 다음 작업은 [배포 진행표](../../deploy-step.md)에서 추적한다.
 
-## 카카오 로그인 키는 지금 어디에 두는가
+## 카카오 로그인 키는 어디에 두는가
 
-현재 BE는 `/api/v1/auth/kakao` 요청으로 **사용자별 카카오 액세스 토큰**을 받고, 그 토큰을 `Authorization: Bearer` 헤더로 카카오 사용자 정보 API에 전달한다. BE에는 카카오 앱 키·REST API 키·Client secret을 읽는 환경변수나 배포 설정이 없다. 따라서 **현재 앱 시크릿 `voicebridge/dev/app`에 카카오 키를 추가할 필요가 없고, BE GitHub Secrets에도 넣지 않는다.** 값을 추가하더라도 현재 앱은 읽지 않는다. [BE의 카카오 사용자 정보 어댑터](https://github.com/42VoiceBridge/42VoiceBridge_BE/blob/develop/src/main/java/com/voicebridge/adapter/out/auth/KakaoUserInfoAdapter.java), [카카오 사용자 정보 API](https://developers.kakao.com/docs/en/kakaologin/rest-api)
+**갱신(2026-10-03):** 예전 BE는 클라이언트가 보낸 카카오 액세스 토큰만 전달받아 서버용 카카오 키가 필요 없었다. 현재 BE(`develop`)는 **인가 코드를 서버에서 토큰으로 교환**하므로(`application.yml`의 카카오 `token-uri`) 서버 비밀값이 필요하다. 따라서 **앱 시크릿 `voicebridge/dev/app`에 다음 필드를 추가한다.** 모두 선택 필드이며 없으면 카카오 로그인만 동작하지 않는다.
 
-카카오 개발자 콘솔에 보이는 키의 종류와 실제 로그인 구현 주체는 별도로 확인한다.
-
-| 항목 | 현재 또는 향후 저장 위치 |
+| 필드 | 값의 출처 |
 |---|---|
-| 로그인 사용자의 액세스 토큰 | 로그인 요청마다 클라이언트가 BE에 전달하는 단기 토큰. 고정 배포 시크릿으로 저장하지 않음 |
-| 웹·모바일 앱의 플랫폼 키 | 해당 클라이언트 앱 설정에서 관리. 현재 BE 배포 시크릿에 넣지 않음 |
-| 카카오 REST API `client_secret` | 향후 **BE가 인가 코드로 토큰을 직접 발급·갱신하는 방식**을 구현한다면 서버 측 비밀값으로 보관. 그때 AWS Secrets Manager와 BE 환경변수·배포 스크립트를 함께 변경 |
+| `KAKAO_CLIENT_ID` | 카카오 개발자 콘솔의 REST API 키 |
+| `KAKAO_CLIENT_SECRET` | 같은 앱의 Client secret(사용 설정한 경우) |
+| `KAKAO_REDIRECT_URI` | `https://<FE 출처>/auth/kakao/callback`. FE의 로그인 시작 값과 카카오 콘솔 등록값과 같아야 한다 |
 
-카카오의 REST API 토큰 발급에서는 설정에 따라 `client_secret`이 필요하다. 지금 BE는 그 토큰 발급 API를 호출하지 않는다. [카카오 로그인 REST API 문서](https://developers.kakao.com/docs/en/kakaologin/rest-api)
+배포 스크립트가 이 값을 BE 컨테이너 환경변수로 전달한다. FE 출처가 정해진 뒤(Terraform apply 후)에 값을 넣고 BE를 다시 배포한다. 도메인이 없을 때 FE 출처는 EIP 공개 DNS 이름이라 EIP를 다시 만들면 세 곳(앱 시크릿, 카카오 콘솔, FE)을 모두 갱신해야 한다. FE의 카카오 JavaScript 키(`VITE_KAKAO_JAVASCRIPT_KEY`)는 FE 이미지 빌드 변수로 서버 시크릿이 아니다. [카카오 로그인 REST API 문서](https://developers.kakao.com/docs/en/kakaologin/rest-api)

@@ -429,6 +429,18 @@ case "$component" in
       echo "AI_SERVER_BASE_URL is unset; AI-dependent endpoints will be unavailable."
     fi
 
+    # 카카오 로그인: BE가 인가 코드를 서버에서 토큰으로 교환하므로 클라이언트 ID/시크릿과 리다이렉트 URI가 필요하다.
+    # 선택 필드다(없으면 BE 기본값 빈 문자열, 카카오 로그인만 동작하지 않는다). KAKAO_REDIRECT_URI는
+    # FE가 로그인을 시작할 때 쓴 값(<FE 출처>/auth/kakao/callback)과 카카오 콘솔 등록값과 모두 같아야 한다.
+    for kakao_key in KAKAO_CLIENT_ID KAKAO_CLIENT_SECRET KAKAO_REDIRECT_URI; do
+      kakao_value=$(jq -r --arg key "$kakao_key" '.[$key] | if type == "string" then . else "" end' <<<"$app_json")
+      if [[ -n "$kakao_value" ]]; then
+        append_env "$kakao_key" "$kakao_value"
+      else
+        echo "$kakao_key is unset; Kakao login will not work until it is added to the app secret."
+      fi
+    done
+
     docker pull "$image" >/dev/null
     deploy_container "$be_name" wait_be_healthy \
       --publish "$be_port:$be_port" --env-file "$env_file" "$image"

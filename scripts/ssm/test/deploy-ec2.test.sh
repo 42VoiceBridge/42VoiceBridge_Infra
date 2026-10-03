@@ -248,6 +248,14 @@ check "헬스체크를 8080으로 수행" grep -Fq "http://127.0.0.1:8080/" "$ST
 check "AI·FE 컨테이너는 건드리지 않음" container_absent voicebridge-ai
 reset_env; STUB_APP_JSON='{"JWT_SECRET":"j","NCP_TTS_API_KEY_ID":"i","NCP_TTS_API_KEY":"k","AI_SERVER_BASE_URL":"http://10.0.1.20:8000"}' run_deploy "${be_args[@]}"
 check "AI_SERVER_BASE_URL을 시크릿에서 그대로 전달(고정 사설 IP)" grep -Fxq 'AI_SERVER_BASE_URL=http://10.0.1.20:8000' "$STUB_STATE/env_file_copy"
+reset_env; STUB_APP_JSON='{"JWT_SECRET":"j","NCP_TTS_API_KEY_ID":"i","NCP_TTS_API_KEY":"k","KAKAO_CLIENT_ID":"kakao-id-1","KAKAO_CLIENT_SECRET":"kakao-secret-1","KAKAO_REDIRECT_URI":"https://host.example.com/auth/kakao/callback"}' run_deploy "${be_args[@]}"
+check "카카오 클라이언트 ID·시크릿·리다이렉트 URI를 env-file로 전달" bash -c "grep -Fxq 'KAKAO_CLIENT_ID=kakao-id-1' '$STUB_STATE/env_file_copy' && grep -Fxq 'KAKAO_CLIENT_SECRET=kakao-secret-1' '$STUB_STATE/env_file_copy' && grep -Fxq 'KAKAO_REDIRECT_URI=https://host.example.com/auth/kakao/callback' '$STUB_STATE/env_file_copy'"
+check "카카오 시크릿이 출력·명령줄에 노출되지 않음" bash -c "! grep -q 'kakao-secret-1' '$STUB_STATE/docker.log' '$work/out' '$work/err'"
+check "카카오 값을 모두 주면 미설정 안내가 없음" bash -c "! grep -q 'Kakao login will not work' '$work/out'"
+reset_env; run_deploy "${be_args[@]}"
+check "카카오 값이 없어도 배포는 성공(선택 필드)" rc_is 0
+check "카카오 값이 없으면 env-file에 넣지 않음" bash -c "! grep -q KAKAO '$STUB_STATE/env_file_copy'"
+check "카카오 값이 없으면 로그인이 안 된다는 안내" out_has "KAKAO_REDIRECT_URI is unset"
 reset_env; STUB_APP_JSON='{"JWT_SECRET":"j"}' run_deploy "${be_args[@]}"
 check "필수 시크릿 필드 누락 → 실패" rc_is 1
 check "누락 시 이미지 pull 전에 실패" log_lacks "docker pull"
