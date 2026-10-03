@@ -4,17 +4,21 @@ name: SSM deploy (manual)
   workflow_dispatch:
     inputs:
       mode:
-        description: Check SSM connectivity or deploy BE/AI main commits
+        description: check = SSM, Docker and the /data mount on all three instances; measure = memory/CPU/disk snapshot of all three (read-only); deploy = given SHAs; redeploy = last successful deployments
         required: true
         type: choice
-        options: [check, deploy]
+        options: [check, measure, deploy, redeploy]
         default: check
       be_sha:
         description: Full 40-character BE main commit SHA (deploy needs be_sha and/or ai_sha)
         required: false
         type: string
       ai_sha:
-        description: Full 40-character AI main commit SHA. AI deploys first; if it fails BE is left untouched
+        description: Full 40-character AI main commit SHA. Order is AI, BE, FE; a failure stops the later ones
+        required: false
+        type: string
+      fe_sha:
+        description: Full 40-character FE main commit SHA
         required: false
         type: string
 
@@ -36,8 +40,10 @@ jobs:
       DEPLOY_MODE: ${{ inputs.mode }}
       BE_SHA: ${{ inputs.be_sha }}
       AI_SHA: ${{ inputs.ai_sha }}
+      FE_SHA: ${{ inputs.fe_sha }}
       BE_IMAGE_REPOSITORY: ${{ vars.BE_IMAGE_REPOSITORY }}
       AI_IMAGE_REPOSITORY: ${{ vars.AI_IMAGE_REPOSITORY }}
+      FE_IMAGE_REPOSITORY: ${{ vars.FE_IMAGE_REPOSITORY }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -51,6 +57,14 @@ jobs:
         with:
           terraform_version: 1.15.3
           terraform_wrapper: false
+      # Terraform apply와 겹치지 않도록 같은 락을 쓴다(check는 읽기 전용이라 락이 필요 없다).
+      - name: Acquire infra lock
+        id: lock
+        if: inputs.mode == 'deploy' || inputs.mode == 'redeploy'
+        run: bash scripts/ci/infra-lock.sh acquire deploy manual "$GITHUB_RUN_ID"
       - name: Check or deploy through SSM
         shell: bash
-        run: bash scripts/ssm/run.sh "$DEPLOY_MODE" "$BE_SHA" "$AI_SHA"
+        run: bash scripts/ssm/run.sh "$DEPLOY_MODE" "$BE_SHA" "$AI_SHA" "$FE_SHA"
+      - name: Release infra lock
+        if: always() && steps.lock.outcome == 'success'
+        run: bash scripts/ci/infra-lock.sh release deploy manual

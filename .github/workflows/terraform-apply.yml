@@ -1,0 +1,96 @@
+name: Terraform apply (one layer, saved plan)
+
+# terraform-plan 워크플로가 만든 plan 파일을 그대로 apply한다. 새로 계산하지 않으므로 검토한 내용만 적용된다.
+# 실행하기 전에 plan 실행의 요약과 아티팩트를 확인한다. 이 워크플로는 수동 실행 전용이며 자동 실행되지 않는다.
+#  - main 브랜치에서만 실행한다. plan이 같은 커밋에서 만들어졌는지, plan 파일이 바뀌지 않았는지 확인한다.
+#  - plan이 리소스를 삭제·교체한다면 allow_destroy=true를 명시해야 한다(인스턴스 교체 포함).
+#  - 하위 레이어가 apply되기 전에는 상위 레이어를 거부한다(1_base → 2_storage → 3_application).
+#  - 서비스 배포와 겹치지 않도록 락을 잡고(scripts/ci/infra-lock.sh), 3_application 적용 후에는
+#    마지막 성공 배포로 새 인스턴스를 복원한다(scripts/ci/post-apply.sh).
+# 승인 게이트는 두지 않았다. PR 승인과 수동 실행이 사람의 확인 절차다(docs/FOLLOW-UPS.md).
+'on':
+  workflow_dispatch:
+    inputs:
+      layer:
+        description: Layer to apply
+        required: true
+        type: choice
+        options: [1_base, 2_storage, 3_application]
+      plan_run_id:
+        description: Run ID of the terraform-plan run whose artifact to apply (digits from its URL)
+        required: true
+        type: string
+      allow_destroy:
+        description: Allow the plan to destroy or replace resources (review the plan summary first)
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: terraform-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      AWS_REGION: ap-northeast-2
+      TF_IN_AUTOMATION: 'true'
+      LAYER: ${{ inputs.layer }}
+      PLAN_RUN_ID: ${{ inputs.plan_run_id }}
+      ALLOW_DESTROY: ${{ inputs.allow_destroy }}
+      BE_IMAGE_REPOSITORY: ${{ vars.BE_IMAGE_REPOSITORY }}
+      AI_IMAGE_REPOSITORY: ${{ vars.AI_IMAGE_REPOSITORY }}
+      FE_IMAGE_REPOSITORY: ${{ vars.FE_IMAGE_REPOSITORY }}
+    steps:
+      - name: Check the plan run id
+        run: |
+          if [[ ! "$PLAN_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::plan_run_id must be the numeric run ID of a terraform-plan run." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: 1.15.3
+          terraform_wrapper: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ inputs.layer }}
+          run-id: ${{ inputs.plan_run_id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          path: ${{ runner.temp }}/plan
+
+      - name: Acquire infra lock (waits for service deployments to finish)
+        id: lock
+        run: bash scripts/ci/infra-lock.sh acquire apply "$GITHUB_RUN_ID"
+
+      - name: Apply the saved plan
+        run: bash scripts/ci/tf-layer.sh apply "$LAYER" "$RUNNER_TEMP/plan"
+
+      # 인스턴스가 교체됐을 수 있으므로 3_application 이후에는 마지막 성공 배포를 다시 올린다.
+      # 락을 쥔 채 진행하므로 새 배포와 겹치지 않는다.
+      - name: Restore the last successful deployments on (re)created instances
+        run: bash scripts/ci/post-apply.sh "$LAYER"
+
+      - name: Release infra lock
+        if: always() && steps.lock.outcome == 'success'
+        run: bash scripts/ci/infra-lock.sh release apply

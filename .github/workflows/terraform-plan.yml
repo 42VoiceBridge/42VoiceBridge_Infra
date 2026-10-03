@@ -1,0 +1,62 @@
+name: Terraform plan (one layer)
+
+# 레이어 하나의 plan을 만들고 요약과 plan 파일(아티팩트)을 남긴다. apply는 하지 않는다.
+# 첫 배포(하위 레이어 state가 없는 상태)에서는 한 번에 전체를 plan할 수 없으므로 반드시 순서대로 진행한다:
+#   1) 1_base plan → 검토 → terraform-apply(1_base)
+#   2) 2_storage plan → 검토 → terraform-apply(2_storage)
+#   3) 3_application plan → 검토 → terraform-apply(3_application)
+# 하위 레이어가 apply되기 전에는 상위 레이어 plan을 거부한다(scripts/ci/tf-layer.sh).
+# apply에 쓸 plan은 main 브랜치에서 만든 것이어야 한다(apply는 plan과 같은 커밋만 허용).
+# 잠금은 유지한다. 필요한 AWS 권한은 docs/FOLLOW-UPS.md 참고.
+'on':
+  workflow_dispatch:
+    inputs:
+      layer:
+        description: Layer to plan
+        required: true
+        type: choice
+        options: [1_base, 2_storage, 3_application]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-plan-${{ inputs.layer }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AWS_REGION: ap-northeast-2
+      TF_IN_AUTOMATION: 'true'
+      LAYER: ${{ inputs.layer }}
+      # 기본값이 없는 입력 변수. Infra 저장소 Variables(비밀 아님)에서 받는다.
+      TF_VAR_ssh_allowed_cidr: ${{ vars.SSH_ALLOWED_CIDR }}
+      TF_VAR_ssh_key_name: ${{ vars.SSH_KEY_NAME }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: 1.15.3
+          terraform_wrapper: false
+
+      - name: Plan the layer
+        run: bash scripts/ci/tf-layer.sh plan "$LAYER" "$RUNNER_TEMP/plan"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ inputs.layer }}
+          path: ${{ runner.temp }}/plan
+          retention-days: 7
+          if-no-files-found: error
