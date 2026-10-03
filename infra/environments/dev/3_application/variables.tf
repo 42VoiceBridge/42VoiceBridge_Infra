@@ -131,8 +131,5 @@ variable "app_secret_name" {
 variable "ghcr_secret_name" {
   description = "Name of the Secrets Manager secret holding GHCR_USERNAME and GHCR_READ_TOKEN (classic PAT with read:packages). Read by all three roles"
   type        = string
-  # TEMP TEST: pointed at the app secret (which already has GHCR_* fields) instead of
-  # creating a dedicated voicebridge/dev/ghcr secret. This also widens AI/FE's IAM policy
-  # to read the app secret, including BE's DB/Redis credentials. Revert once confirmed.
-  default = "voicebridge/dev/app"
+  default     = "voicebridge/dev/ghcr"
 }
