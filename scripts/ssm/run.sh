@@ -141,7 +141,7 @@ if [[ "$mode" == check ]]; then
     wait_online "$instance_id"
     # AI는 /data 마운트까지 확인한다(AI 배포는 별도 EBS 볼륨이 마운트돼 있어야 한다).
     if [[ "$comp" == ai ]]; then
-      jq -n '{commands:["set +e", "AWS_DEFAULT_REGION=ap-northeast-2 aws secretsmanager get-secret-value --secret-id voicebridge/dev/ghcr --query SecretString --output text >/tmp/g.out 2>/tmp/g.err", "echo rc=$?", "echo ---stdout(keys only)---", "jq -r \"keys\" </tmp/g.out 2>&1", "echo ---stderr---", "cat /tmp/g.err"], executionTimeout:["60"]}' >"$parameters_file"
+      jq -n '{commands:["set +e", "AWS_DEFAULT_REGION=ap-northeast-2 aws secretsmanager get-secret-value --secret-id voicebridge/dev/ghcr --query SecretString --output text >/tmp/g.out 2>/tmp/g.err", "echo rc=$?", "echo STDOUT_KEYS:", "jq -r \"keys\" </tmp/g.out 2>&1", "echo STDERR:", "cat /tmp/g.err"], executionTimeout:["60"]}' >"$parameters_file"
     else
       jq -n --arg comp "$comp" '{commands:["set -e", "systemctl is-active amazon-ssm-agent", "docker info >/dev/null", "echo \"SSM and Docker ready (" + $comp + ")\""], executionTimeout:["60"]}' >"$parameters_file"
     fi
