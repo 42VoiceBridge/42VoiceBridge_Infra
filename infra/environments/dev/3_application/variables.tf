@@ -15,13 +15,13 @@ variable "aws_region" {
 variable "be_instance_type" {
   description = "EC2 instance type for the BE instance (initial trial size)"
   type        = string
-  default     = "m5.large"
+  default     = "t3.small"
 }
 
 variable "ai_instance_type" {
   description = "EC2 instance type for the AI instance. Initial trial size: 4 vCPU for CPU training headroom; confirm with measurements"
   type        = string
-  default     = "m5.xlarge"
+  default     = "t3.small"
 }
 
 variable "fe_instance_type" {
