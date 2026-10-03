@@ -69,6 +69,7 @@
 | **배포 기록**(새로 추가됨) | `ssm:PutParameter`, `ssm:GetParameter` on `arn:aws:ssm:ap-northeast-2:<계정>:parameter/voicebridge/dev/deployed/*`. 없으면 배포는 성공하되 기록 경고가 나오고 인스턴스 교체 후 복원(`redeploy`)이 되지 않는다 |
 | Terraform 적용 | EC2, VPC, RDS, ElastiCache, S3, IAM(역할·인스턴스 프로파일·정책), DLM, EBS, EIP 관리 권한 |
 
+- **apply 전에 확인할 권한 공백(미확인):** 현재 연결된 정책 7개([배포 설정 문서](DEPLOYMENT-SETUP.md))에는 **DLM(`dlm:*`) 권한이 보이지 않는다.** `AmazonEC2FullAccess`는 `ec2:*`이지 `dlm:*`이 아니다. 스냅샷 정책(`aws_dlm_lifecycle_policy`) 생성이 `AccessDenied`로 막히면 `3_application` apply가 인스턴스 생성 뒤 중간에 멈춘다. apply 전에 `dlm:*`(또는 `CreateLifecyclePolicy`, `GetLifecyclePolicy`, `UpdateLifecyclePolicy`, `DeleteLifecyclePolicy`, `TagResource`)을 허용하는 인라인 정책을 배포 사용자에 추가한다. `iam:PassRole`(DLM 역할)은 `IAMFullAccess`가 이미 포함한다.
 - S3 조건부 쓰기(`--if-none-match`)는 비교적 최근 AWS CLI가 필요하다. 미확인: GitHub 러너의 CLI 버전에서 동작하는지(첫 실행에서 확인).
 
 ---
