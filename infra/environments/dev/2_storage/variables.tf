@@ -13,7 +13,7 @@ variable "aws_region" {
 variable "rds_instance_class" {
   description = "RDS instance class"
   type        = string
-  default     = "db.r5.large"
+  default     = "db.t3.micro"
 }
 
 variable "redis_node_type" {
