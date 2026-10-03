@@ -8,7 +8,7 @@
 |---|---|---|---|
 | 1 | **AWS 키**(plan용·CI용) 준비 | 이게 없으면 `plan`도 실행되지 않는다 | 운영자 |
 | 2 | **호출 방식**과 토큰 정리 | 이벤트로 배포가 실행되는 구조라 토큰이 곧 배포 권한이다 | 운영자 + 각 레포 |
-| 3 | BE: 이벤트 전송, RDS 초기 스키마, 헬스 엔드포인트 | BE 배포 자체가 막혀 있다 | BE 팀 |
+| 3 | BE: RDS 초기 스키마, 헬스 엔드포인트, 카카오 값 등록(이벤트 전송은 구현됨) | BE 배포·로그인이 막혀 있다 | BE 팀 |
 | 4 | FE: 같은 출처 API(`VITE_API_URL` 빈 값) | 프록시 구조에서 호스트가 바뀌어도 같은 이미지를 쓰려면 필요 | FE 팀 |
 | 5 | 도메인과 카카오 도메인 등록 | 안정적인 HTTPS와 로그인 | 운영자 |
 | 6 | 이미지 다이제스트 고정 | 태그 덮어쓰기 방지 | Infra + 각 레포 |
@@ -122,7 +122,8 @@
 
 ## 3. BE 레포
 
-- [ ] CI 성공·이미지 게시 후 `deploy-backend` 이벤트 전송 추가(위 2번)
+- [x] CI 성공·이미지 게시 후 `deploy-backend` 이벤트 전송: **BE `develop`에 구현됨**(PR #48, `ref`와 40자 `sha` 전송). 토큰은 `secrets.INFRA_DISPATCH_TOKEN`. Infra PR이 `main`에 머지돼야 실제로 배포가 실행된다. 송신 단계 주석의 "cd-preflight" 설명은 이제 `deploy-backend.yml`이 받으므로 갱신 필요
+- [ ] **카카오 서버 설정:** BE가 인가 코드를 서버에서 교환하므로 앱 시크릿에 `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI`가 필요하다. 값은 FE 주소 확정 후 등록([환경변수 명세](ENVIRONMENT-VARIABLES.md#카카오-로그인과-aws-키))
 - [ ] **RDS 초기 스키마/마이그레이션 방법.** `prod`는 `ddl-auto: validate`라 빈 DB에서는 앱이 뜨지 않는다. Flyway 같은 도구나 초기 SQL이 필요하다
 - [ ] 헬스 엔드포인트(예: `/actuator/health`). 지금 Infra는 8080이 **어떤 HTTP 응답이든 하면** 성공으로 본다(4xx/5xx 포함). 헬스가 생기면 배포 검사를 200 확인으로 강화할 수 있다
 - [ ] `AI_SERVER_BASE_URL`을 앱 시크릿에 `terraform output ai_base_url` 값으로 등록하는 절차 숙지

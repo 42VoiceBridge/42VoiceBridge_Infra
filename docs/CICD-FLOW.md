@@ -32,13 +32,13 @@ sequenceDiagram
 | 이벤트 | 보내는 쪽 | Infra 워크플로 | 소스 레포(출처 검증) | 이미지 변수 | 배포 대상 |
 |---|---|---|---|---|---|
 | `deploy-ai` | AI CI(구현됨) | [`deploy-ai.yml`](../.github/workflows/deploy-ai.yml) | `42VoiceBridge/42VoiceBridge_AI` | `AI_IMAGE_REPOSITORY` | AI 인스턴스 |
-| `deploy-backend` | BE CI(**미구현**) | [`deploy-backend.yml`](../.github/workflows/deploy-backend.yml) | `42VoiceBridge/42VoiceBridge_BE` | `BE_IMAGE_REPOSITORY` | BE 인스턴스 |
+| `deploy-backend` | BE CI(**구현됨**, BE `develop` PR #48) | [`deploy-backend.yml`](../.github/workflows/deploy-backend.yml) | `42VoiceBridge/42VoiceBridge_BE` | `BE_IMAGE_REPOSITORY` | BE 인스턴스 |
 | `deploy-frontend` | FE CI(구현됨) | [`deploy-frontend.yml`](../.github/workflows/deploy-frontend.yml) | `42VoiceBridge/42VoiceBridge_FE` | `FE_IMAGE_REPOSITORY` | FE 인스턴스 |
 
 - payload: `{"event_type": "...", "client_payload": {"ref": "refs/heads/main", "sha": "<40자 소문자>", "image": "<선택>"}}`. `image`는 있어도 **배포에 쓰지 않는다.** Infra의 `*_IMAGE_REPOSITORY` 변수와 SHA로 조립한 값과 같은지만 비교하고 다르면 중단한다.
 - 세 워크플로는 [`deploy-component.yml`](../.github/workflows/deploy-component.yml)(재사용)을 호출하는 얇은 파일이다. 같은 컴포넌트의 이벤트는 직렬화하고(`concurrency: deploy-<컴포넌트>`), 다른 컴포넌트는 병렬로 돈다.
 - `repository_dispatch`는 **기본 브랜치(`main`)의 워크플로만** 실행한다. 이 워크플로들이 `main`에 머지되기 전에는 이벤트가 와도 아무것도 실행되지 않는다(API는 204를 반환한다). 보내는 쪽 CI가 성공으로 끝나도 배포가 되지 않은 것이므로 주의한다.
-- BE의 `deploy-backend`는 예전에 `cd-preflight`가 받아 점검만 했다. 이제 `deploy-backend.yml`이 받아 **실제로 배포한다.** BE CI가 이 이벤트를 보내도록 추가하는 것은 BE 레포의 작업이다.
+- BE의 `deploy-backend`는 예전에 `cd-preflight`가 받아 점검만 했다. 이제 `deploy-backend.yml`이 받아 **실제로 배포한다.** BE CI는 이 이벤트를 보내도록 이미 구현돼 있다(`develop`). 단 BE의 `main`에 반영돼야 `ref=refs/heads/main` 이벤트가 나간다.
 
 ### 입력 검증과 출처 검증 (보안)
 
