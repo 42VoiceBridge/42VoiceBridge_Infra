@@ -24,6 +24,9 @@ resource "aws_instance" "be" {
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
     data_device = ""
   })
+  # cloud-init은 인스턴스당 한 번만 user_data를 실행한다. 바뀐 스크립트가 실제로 적용되도록
+  # user_data 변경 시 in-place 업데이트 대신 교체를 강제한다.
+  user_data_replace_on_change = true
 
   # 참고용 태그 — 실제 연결 정보는 2_storage layer의 terraform output으로 확인
   tags = {

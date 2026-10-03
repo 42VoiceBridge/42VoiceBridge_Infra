@@ -46,6 +46,9 @@ resource "aws_instance" "ai" {
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
     data_device = "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${replace(aws_ebs_volume.data.id, "-", "")}"
   })
+  # cloud-init은 인스턴스당 한 번만 user_data를 실행한다. 바뀐 스크립트가 실제로 적용되도록
+  # user_data 변경 시 in-place 업데이트 대신 교체를 강제한다.
+  user_data_replace_on_change = true
 
   tags = {
     Name = "${var.project_name}-ai"
