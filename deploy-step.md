@@ -14,6 +14,12 @@
 - [x] [CD 준비 점검](.github/workflows/cd-preflight.yml)에서 AWS 인증, S3 버킷 리전, 세 레이어 `terraform init`·`validate` 성공. [성공한 실행](https://github.com/42VoiceBridge/42VoiceBridge_Infra/actions/runs/36981904406). `apply`는 하지 않았다.
 - [x] 운영자 확인: 서울 리전 Secrets Manager에 CLOVA Voice Client ID·Secret 및 JWT 서명용 값을 등록(시크릿 이름·필드명은 미확인), GHCR 자격 증명 `GHCR_USERNAME`/`GHCR_READ_TOKEN`(PAT)을 시크릿에 등록했다고 보고(어느 시크릿인지, PAT 종류는 미확인).
 - [x] 각 레포를 읽어 확인(2026-10-03): AI(포트 8000, 40자 SHA 태그, `HOST=0.0.0.0`, uid 10001, 모델 적재 후 포트 오픈, 메모리 실측), FE(nginx 80, API `/api/v1/**`, `VITE_API_URL` 빌드 시점 고정), BE(포트 8080, 헬스 엔드포인트 없음, `validate`).
+- [x] PR #10(ADR 0006) 리뷰 후 `main` 머지(커밋 `2889467`). 이벤트 워크플로(`deploy-ai`/`deploy-backend`/`deploy-frontend`)가 이제부터 트리거 가능.
+- [x] **1_base → 2_storage → 3_application 순서로 실제 AWS에 plan·apply 완료**(레이어당 1회 이상 재시도, 아래 "적용 중 발견·수정한 문제" 참고).
+  - 1_base: VPC, 서브넷 3개, IGW, 라우트테이블+연결, 보안그룹 5개(fe/be/ai/rds/redis). 전부 신규 생성, 삭제 없음.
+  - 2_storage: RDS(`db.t3.micro`, 20GB), ElastiCache(`cache.m5.large`), S3 `voicebridge-recordings-*`.
+  - 3_application: EC2 3대(FE/BE/AI, 사양은 임시 축소 — 아래 참고), IAM 역할·프로필·정책, FE Elastic IP(`ec2-3-34-9-37.ap-northeast-2.compute.amazonaws.com`), AI 데이터 EBS + DLM 스냅샷 정책.
+- [x] `ssm-deploy.yml`(`mode=check`)로 세 인스턴스 SSM 연결·Docker·AI `/data` 마운트 전부 정상 확인. [실행](https://github.com/42VoiceBridge/42VoiceBridge_Infra/actions/runs/37131599678)
 
 ### 코드·오프라인 테스트 완료 (AWS 적용·실행은 전)
 
@@ -23,33 +29,43 @@
 - [x] 오프라인 검증: shellcheck, 스크립트·워크플로 테스트 7종, `terraform fmt`/`validate`/mock `terraform test` 20개. 일부러 깨뜨린 변형으로 실제로 실패를 잡는지 확인. [검증 가이드](docs/INFRA-VERIFICATION.md)
 - [x] 문서: [네트워크·엣지](docs/NETWORK-AND-EDGE.md), [CI/CD 흐름](docs/CICD-FLOW.md), [AI 배포](docs/AI-DEPLOYMENT.md), [데이터 보호](docs/DATA-PROTECTION.md), [사양 확정](docs/OPERATIONS-SIZING.md), [후속 작업](docs/FOLLOW-UPS.md).
 
+### 적용 중 발견·수정한 문제 (2026-10-03)
+
+실제 AWS 적용 전까지는 드러나지 않던 문제 4개. 전부 `main`에 커밋·반영했다.
+
+- [x] **RDS·EC2 인스턴스 사이즈가 이 AWS 계정의 Free Tier 제한에 걸림**(`FreeTierRestrictionError`/`InvalidParameterCombination`). 설계값인 `db.r5.large`, BE `m5.large`, AI `m5.xlarge`가 전부 거부됨(FE `t3.small`만 통과). RDS는 `db.t3.micro`(20GB)로, BE·AI는 `t3.small`로 **임시 축소**했다 — 정식 사양은 미확정이며 실측 후 [사양 확정 절차](docs/OPERATIONS-SIZING.md)로 재조정 필요.
+- [x] **EC2 AMI 필터 버그**: `al2023-ami-*-x86_64` 필터가 ECS 최적화 변종(`al2023-ami-ecs-hvm-...`)까지 매칭해 `most_recent`로 뽑혀, 세 인스턴스가 전부 의도와 다른 AMI로 떴다(`docker images`에 `ecs-agent` 등이 보여 발견). 필터를 `al2023-ami-2*-x86_64`로 좁혔다.
+- [x] **`dnf install -y docker jq curl` 실패**: 최신 AL2023 AMI가 기본으로 `curl-minimal`을 포함하는데 풀 버전 `curl` 설치가 충돌(`--allowerasing` 필요). dnf가 전체 실패해 Docker가 끝내 설치되지 않았다(`/var/log/cloud-init-output.log`로 확인). `--allowerasing` 추가.
+- [x] **`user_data` 변경이 인스턴스에 반영되지 않음**: `aws_instance`는 `user_data` 변경을 기본적으로 in-place 업데이트로만 처리하는데, 이미 부팅된 인스턴스는 cloud-init이 user_data를 다시 실행하지 않는다. `user_data_replace_on_change = true`를 추가해 교체를 강제하도록 고쳤다.
+- [x] **AI 데이터 볼륨 마운트 실패**: `mkfs -L voicebridge-data`의 레이블이 17자인데 XFS 레이블은 최대 12자라 포맷 자체가 거부됐다(`/var/log/voicebridge-data-volume.log`로 확인). 레이블을 `vb-data`로 줄였다.
+
 ### 미확인·미완료
 
-- [ ] **`terraform plan` 미실행**(세션의 AWS 키가 플레이스홀더). 레이어별 plan 검토 후 apply. 순서·기대 리소스 개수는 [검증 가이드](docs/INFRA-VERIFICATION.md#4-plan-검토-적용-전).
-- [ ] 실제 EC2에서의 user_data(볼륨 마운트), SSM 등록, 배포, **Let's Encrypt 발급(EIP 공개 DNS 이름)**, GHCR pull(PAT 권한).
-- [ ] GitHub Actions에서의 실제 실행(재사용 워크플로, 아티팩트, S3 조건부 쓰기 락). 이벤트 워크플로는 `main`에 머지돼야 실행된다.
+- [ ] **`voicebridge/dev/ghcr` 시크릿 미생성 — 앱 배포가 AI 단계에서 막힘.** GHCR 자격 증명을 `voicebridge/dev/app`에 넣어뒀다는 보고가 있었으나 AI·FE 역할은 그 시크릿을 읽을 IAM 권한이 없다(BE만 가능, 전환기 폴백). `voicebridge/dev/app`을 가리키도록 임시로 바꿔 동작은 확인했지만 AI·FE가 BE의 DB·Redis 자격 증명까지 읽게 되는 부작용이 있어 원복했다. 운영자가 내일 `voicebridge/dev/ghcr`를 별도로 생성하기로 함.
+- [ ] GitHub Actions에서의 실제 이벤트 실행(재사용 워크플로, 아티팩트, S3 조건부 쓰기 락)은 여전히 미확인. 이벤트 워크플로는 `main`에 머지됐으니(완료) 각 레포 CI가 실제로 호출하는지만 남음.
 - [ ] 배포용 IAM 사용자에 `locks/dev/*`, SSM Parameter Store `/voicebridge/dev/deployed/*` 권한이 있는지.
-- [ ] 인스턴스 사양(BE `m5.large`, AI `m5.xlarge`, FE `t3.small`)은 **초기 시험 사양**이다. 메모리·CPU 실측으로 확정. 비용(약 $0.9/시간)은 추정치.
+- [ ] **인스턴스 사양은 AWS 계정의 Free Tier 제한 때문에 임시로 축소된 상태**(RDS `db.t3.micro`, BE·AI `t3.small`, ElastiCache만 원래 `cache.m5.large`로 통과). 원래 설계값(BE `m5.large`, AI `m5.xlarge`, RDS `db.r5.large`)으로 되돌리려면 AWS 계정 플랜 업그레이드가 먼저 필요하다. 메모리·CPU 실측으로 정식 사양 확정 필요. 비용(약 $0.9/시간)은 추정치이며 현재 축소된 사양으로는 더 낮다.
 - [ ] SSH와 SSM 중 최종 접속·배포 방식 결정. [ADR 0004](docs/adr/0004-ec2-access-method.md)는 `Pending`(SSH는 BE에만 남김).
+- [ ] Let's Encrypt 발급(EIP 공개 DNS 이름), GHCR pull(PAT 권한 범위) 모두 실제 앱 배포 시점에 확인 필요 — 아직 컨테이너가 하나도 안 떠서 미확인.
 
 ## 다음 작업 순서
 
-### 1. 적용 전 (운영자)
+### 1. 적용 전 (운영자) — 완료
 
-- [ ] AWS 읽기용 plan 키 준비(클라우드 세션 환경 설정에 등록, 채팅에 붙여넣지 않음). 필요한 권한은 [후속 작업](docs/FOLLOW-UPS.md#1-aws-키).
-- [ ] Infra 저장소 Variables 설정: `BE_/AI_/FE_IMAGE_REPOSITORY`(자리 표시자 금지), `SSH_ALLOWED_CIDR`(`0.0.0.0/0` 금지), `SSH_KEY_NAME`.
-- [ ] 시크릿 준비: `voicebridge/dev/app`(BE 값), **`voicebridge/dev/ghcr`**(classic PAT, `read:packages`, 세 패키지, SSO 승인). AI·FE는 `ghcr` 시크릿이 없으면 배포되지 않는다.
-- [ ] 이미 만들어진 EC2나 state가 있는지 확인(있으면 plan에서 교체가 나타난다).
-- [ ] PR #10 리뷰·머지(워크플로가 `main`에 있어야 이벤트가 실행된다).
+- [x] AWS 읽기·쓰기 키를 Infra 저장소 Secrets에 등록.
+- [x] Infra 저장소 Variables 설정: `BE_/AI_/FE_IMAGE_REPOSITORY`, `SSH_ALLOWED_CIDR`, `SSH_KEY_NAME`.
+- [x] PR #10 리뷰·머지(`2889467`).
+- [ ] `voicebridge/dev/ghcr` 시크릿 생성(classic PAT, `read:packages`, 세 패키지, SSO 승인). **아직 남음 — AI·FE는 이게 없으면 배포되지 않는다.**
 
-### 2. 레이어별 프로비저닝
+### 2. 레이어별 프로비저닝 — 완료
 
-- [ ] `1_base` plan → 검토 → apply → `2_storage` plan → 검토 → apply → `3_application` plan → 검토 → apply. 검토 항목: [검증 가이드](docs/INFRA-VERIFICATION.md#4-plan-검토-적용-전).
-- [ ] `3_application` apply 직후 자동 `check`(SSM, Docker, AI `/data` 마운트) 통과 확인.
-- [ ] apply 후 확인(네트워크 양성·음성 테스트, IAM 음성 테스트, 데이터 볼륨, HTTPS): [검증 가이드](docs/INFRA-VERIFICATION.md#5-apply-후-확인-실제-aws).
+- [x] `1_base` plan → 검토 → apply → `2_storage` plan → 검토 → apply → `3_application` plan → 검토 → apply. 과정에서 발견한 문제 4개는 위 "적용 중 발견·수정한 문제" 참고.
+- [x] `3_application` apply 후 수동 `check`(SSM, Docker, AI `/data` 마운트) 통과 확인. [실행](https://github.com/42VoiceBridge/42VoiceBridge_Infra/actions/runs/37131599678)
+- [ ] apply 후 확인(네트워크 양성·음성 테스트, IAM 음성 테스트, HTTPS)은 아직: [검증 가이드](docs/INFRA-VERIFICATION.md#5-apply-후-확인-실제-aws).
 
-### 3. 앱 배포
+### 3. 앱 배포 — 다음 작업
 
+- [ ] **`voicebridge/dev/ghcr` 시크릿 생성 후 `ssm-deploy.yml`(`mode=deploy`)를 AI/BE/FE SHA와 함께 재실행.** BE `2b21d4a`, AI `f08764b`, FE `f1638fa`(2026-10-03 기준 각 레포 `main` 최신 커밋 — 재실행 시점에 다시 확인).
 - [ ] AI: `script_pool.json` 업로드, `ai_sha` 배포, `/v1/health` 200 확인. [AI 배포 가이드](docs/AI-DEPLOYMENT.md)
 - [ ] 앱 시크릿에 `AI_SERVER_BASE_URL=http://10.0.1.20:8000`(`terraform output ai_base_url`) 등록 후 BE 배포.
 - [ ] FE 배포, HTTPS 확인. FE 레포의 같은 출처 API 지원 필요([네트워크·엣지](docs/NETWORK-AND-EDGE.md#fe-레포에-요청할-변경-같은-출처-api)).
@@ -78,3 +94,4 @@
 | 2026-10-03 | AI 서빙 위치를 같은 EC2의 별도 컨테이너로 확정하고 데이터 볼륨·AI 배포 코드·오프라인 테스트를 구현. AWS 적용과 실측은 전 | [ADR 0005](docs/adr/0005-ai-serving-topology.md), [AI 배포 가이드](docs/AI-DEPLOYMENT.md) |
 | 2026-10-03 | AI팀 전달 반영: `deploy-ai` 이벤트 수신 워크플로 추가(이미지 경로는 payload를 신뢰하지 않고 Infra 변수와 SHA로 조립), AI 데이터 디렉터리 `enroll`·`jobs` 및 소유권(uid 10001) 보정, `ALLOW_CPU_TRAIN=1` 전달, ADR 0005에 CPU 학습 정정과 메모리 실측(517 MiB 대기, 1.67 GiB 전사 3건 후) 반영. `main` 반영 전에는 이벤트가 워크플로를 실행하지 않음 | [deploy-ai.yml](.github/workflows/deploy-ai.yml), [ADR 0005](docs/adr/0005-ai-serving-topology.md), AI 저장소 `docs/INFRA_AI_배포_정보_2026-10-03.md` |
 | 2026-10-03 | 운영자 결정으로 FE·BE·AI를 개별 인스턴스로 분리(ADR 0006, ADR 0005 대체). Terraform(보안그룹 5개, 인스턴스 3대, 고정 사설 IP, FE EIP, 역할별 IAM, AI 데이터 볼륨 + DLM), 배포 스크립트·`run.sh`, 이벤트 워크플로 3종, 락, 레이어별 plan/apply, 문서와 오프라인 테스트를 구현. 리뷰 지적 반영: 세 역할의 `deploy/scripts/*` 읽기 누락, 초기 레이어별 순서, BE 포트 8080 통일, FE→BE 주소 고정, GHCR 시크릿 분리의 동시 전환, apply·배포 충돌, `-lock=false` 철회(잠금은 S3 네이티브이며 DynamoDB 아님). AWS 적용·plan·실측은 전 | [ADR 0006](docs/adr/0006-three-instance-topology.md), [검증 가이드](docs/INFRA-VERIFICATION.md), [후속 작업](docs/FOLLOW-UPS.md) |
+| 2026-10-03 | PR #10 머지 후 1_base → 2_storage → 3_application을 실제 AWS에 plan·apply. 과정에서 Free Tier 제한(RDS·BE·AI 인스턴스 사이즈 임시 축소), AMI 필터가 ECS 변종을 잘못 선택, `dnf install docker`가 `curl-minimal`과 충돌, `user_data` 변경이 재부팅으로 반영되지 않음, XFS 레이블 12자 초과로 AI `/data` 마운트 실패 — 4개 문제를 발견해 전부 수정. `check` 모드로 세 인스턴스 SSM·Docker·AI 마운트 정상 확인. 실제 앱 배포(`deploy` 모드)는 `voicebridge/dev/ghcr` 시크릿 미생성으로 AI 단계에서 보류(`voicebridge/dev/app`으로의 임시 전환은 보안 경계상 원복) | 워크플로 실행 기록(`terraform-plan`/`terraform-apply`/`ssm-deploy` 다수), 커밋 `2889467`→`f9eba55` |
