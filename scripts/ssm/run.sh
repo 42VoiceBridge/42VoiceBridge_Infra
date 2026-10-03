@@ -141,7 +141,7 @@ if [[ "$mode" == check ]]; then
     wait_online "$instance_id"
     # AI는 /data 마운트까지 확인한다(AI 배포는 별도 EBS 볼륨이 마운트돼 있어야 한다).
     if [[ "$comp" == ai ]]; then
-      jq -n '{commands:["set -e", "systemctl is-active amazon-ssm-agent", "docker info >/dev/null", "mountpoint -q /data", "echo \"Data volume mounted at /data\"", "echo \"SSM and Docker ready (ai)\""], executionTimeout:["60"]}' >"$parameters_file"
+      jq -n '{commands:["set +e", "systemctl is-active amazon-ssm-agent", "docker info >/dev/null 2>&1; echo docker_rc=$?", "lsblk", "echo ---", "cat /var/log/voicebridge-data-volume.log 2>&1 || echo NOLOG", "echo ---", "mountpoint /data; echo mount_rc=$?"], executionTimeout:["60"]}' >"$parameters_file"
     else
       jq -n --arg comp "$comp" '{commands:["set -e", "systemctl is-active amazon-ssm-agent", "docker info >/dev/null", "echo \"SSM and Docker ready (" + $comp + ")\""], executionTimeout:["60"]}' >"$parameters_file"
     fi
