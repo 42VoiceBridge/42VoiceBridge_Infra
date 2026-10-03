@@ -1,6 +1,6 @@
 #!/bin/bash
 dnf update -y
-dnf install -y docker jq curl
+dnf install -y --allowerasing docker jq curl
 systemctl enable docker
 systemctl start docker
 systemctl enable --now amazon-ssm-agent
