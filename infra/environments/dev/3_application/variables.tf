@@ -26,3 +26,15 @@ variable "app_secret_name" {
   type        = string
   default     = "voicebridge/dev/app"
 }
+
+variable "root_volume_size_gb" {
+  description = "Root EBS volume size (GiB). Holds the OS and Docker images (BE + AI); 40 leaves room for the PyTorch-based AI image"
+  type        = number
+  default     = 40
+}
+
+variable "data_volume_size_gb" {
+  description = "Persistent data EBS volume size (GiB) mounted at /data (HF model cache, personalized adapters, prompt pool)"
+  type        = number
+  default     = 20
+}

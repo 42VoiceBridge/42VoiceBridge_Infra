@@ -12,3 +12,8 @@ output "app_secret_name" {
   description = "Name of the manually created application secret"
   value       = var.app_secret_name
 }
+
+output "data_volume_id" {
+  description = "Persistent EBS volume ID mounted at /data"
+  value       = aws_ebs_volume.data.id
+}

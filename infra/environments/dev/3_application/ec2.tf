@@ -13,6 +13,30 @@ data "aws_ami" "al2023" {
   }
 }
 
+# 데이터 볼륨은 인스턴스와 같은 AZ여야 한다. 인스턴스 속성이 아니라 서브넷에서 AZ를
+# 얻어야 volume → user_data(볼륨 ID 참조) → instance 순서가 순환 없이 성립한다.
+data "aws_subnet" "app" {
+  id = data.terraform_remote_state.base.outputs.public_subnet_id
+}
+
+# AI 모델 캐시, 개인화 어댑터, 프롬프트 풀 같은 상태 데이터를 보관하는 영구 볼륨.
+# 인스턴스가 교체돼도 이 볼륨은 남아야 하므로 prevent_destroy를 건다.
+# 의도적으로 삭제하려면 docs/AI-DEPLOYMENT.md의 "데이터 볼륨 삭제" 절차를 따른다.
+resource "aws_ebs_volume" "data" {
+  availability_zone = data.aws_subnet.app.availability_zone
+  type              = "gp3"
+  size              = var.data_volume_size_gb
+  encrypted         = true
+
+  tags = {
+    Name = "${var.project_name}-data"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 resource "aws_instance" "app" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = var.instance_type
@@ -30,18 +54,13 @@ resource "aws_instance" "app" {
 
   root_block_device {
     volume_type = "gp3"
-    volume_size = 30
+    volume_size = var.root_volume_size_gb
   }
 
-  user_data = <<-EOF
-    #!/bin/bash
-    dnf update -y
-    dnf install -y docker jq curl
-    systemctl enable docker
-    systemctl start docker
-    systemctl enable --now amazon-ssm-agent
-    usermod -aG docker ec2-user
-  EOF
+  # 최초 부팅 때만 실행된다. 데이터 볼륨 포맷·마운트 로직은 템플릿 파일에 있다.
+  user_data = templatefile("${path.module}/user_data.sh.tftpl", {
+    data_device = "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${replace(aws_ebs_volume.data.id, "-", "")}"
+  })
 
   # 참고용 태그 — 실제 연결 정보는 2_storage layer의 terraform output으로 확인
   tags = {
@@ -56,6 +75,17 @@ resource "aws_instance" "app" {
     aws_iam_role_policy.secrets_access,
     aws_iam_role_policy.s3_access,
   ]
+}
+
+# Nitro(m5) 인스턴스에서는 /dev/sdf가 /dev/nvme1n1 등으로 보인다. OS 쪽에서는
+# 장치 이름이 아니라 볼륨 ID 기반 /dev/disk/by-id 경로로 식별한다(user_data 참고).
+resource "aws_volume_attachment" "data" {
+  device_name = "/dev/sdf"
+  volume_id   = aws_ebs_volume.data.id
+  instance_id = aws_instance.app.id
+
+  # destroy나 교체 시 인스턴스를 먼저 정지해 파일시스템이 깨진 채 분리되지 않게 한다.
+  stop_instance_before_detaching = true
 }
 
 resource "aws_eip" "app" {
