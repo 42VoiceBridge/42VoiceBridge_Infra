@@ -34,7 +34,7 @@ mount_data_volume() {
   case "$rc" in
     0) echo "Existing signature found on $device; skipping format." ;;
     2) echo "Blank volume; creating xfs filesystem."
-       mkfs -t xfs -L voicebridge-data "$device" ;;
+       mkfs -t xfs -L vb-data "$device" ;;
     *) echo "blkid failed (exit $rc) on $device; refusing to format." >&2
        return 1 ;;
   esac
