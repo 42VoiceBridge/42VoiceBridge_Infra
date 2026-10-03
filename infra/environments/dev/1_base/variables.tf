@@ -11,6 +11,6 @@ variable "aws_region" {
 }
 
 variable "ssh_allowed_cidr" {
-  description = "CIDR block allowed to SSH (port 22) into the app server. Do NOT use 0.0.0.0/0 — restrict to your own IP (e.g. 1.2.3.4/32)."
+  description = "CIDR block allowed to SSH (port 22) into the BE instance (AI and FE are reached through SSM only). Do NOT use 0.0.0.0/0 — restrict to your own IP (e.g. 1.2.3.4/32)."
   type        = string
 }

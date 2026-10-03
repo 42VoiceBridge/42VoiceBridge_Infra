@@ -6,6 +6,7 @@ systemctl start docker
 systemctl enable --now amazon-ssm-agent
 usermod -aG docker ec2-user
 
+%{ if data_device != "" ~}
 # --- 영구 데이터 볼륨(/data) ---
 # 로그는 /var/log/voicebridge-data-volume.log. 실패해도 위의 Docker/SSM 설치는 이미 끝난
 # 상태이며, 배포 스크립트가 /data 마운트 여부를 확인하고 미마운트 시 AI 배포를 거부한다.
@@ -52,3 +53,4 @@ mount_data_volume() {
 
 mount_data_volume || echo "Data volume setup FAILED; see messages above." >&2
 exec 1>&3 2>&4
+%{ endif ~}

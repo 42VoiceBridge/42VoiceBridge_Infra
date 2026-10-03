@@ -1,9 +1,22 @@
 # Copy this file to terraform.tfvars and fill in real values.
 # terraform.tfvars is gitignored — never commit it.
 
-project_name  = "voicebridge"
-aws_region    = "ap-northeast-2"
-instance_type = "m5.large"
+project_name = "voicebridge"
+aws_region   = "ap-northeast-2"
 
-# Name of an existing EC2 key pair created in the AWS Console.
+# 초기 시험 사양. 배포 후 실측으로 조정한다(docs/OPERATIONS-SIZING.md).
+be_instance_type = "m5.large"
+ai_instance_type = "m5.xlarge"
+fe_instance_type = "t3.small"
+
+# 고정 사설 IP (퍼블릭 서브넷 10.0.1.0/24 안)
+be_private_ip = "10.0.1.10"
+ai_private_ip = "10.0.1.20"
+fe_private_ip = "10.0.1.30"
+
+# 도메인이 없으면 비워 둔다(EIP의 공개 DNS 이름으로 HTTPS 발급). 도메인이 생기면 A 레코드를
+# fe_public_ip로 연결한 뒤 여기에 설정한다.
+fe_domain = ""
+
+# Name of an existing EC2 key pair created in the AWS Console (BE SSH only).
 ssh_key_name = "<YOUR_KEY_PAIR_NAME>"
