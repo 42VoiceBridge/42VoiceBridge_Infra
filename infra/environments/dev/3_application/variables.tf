@@ -20,3 +20,9 @@ variable "ssh_key_name" {
   description = "Name of the existing EC2 key pair (create in AWS Console) to use for SSH access"
   type        = string
 }
+
+variable "app_secret_name" {
+  description = "Name of the manually created Secrets Manager secret for backend runtime values"
+  type        = string
+  default     = "voicebridge/dev/app"
+}

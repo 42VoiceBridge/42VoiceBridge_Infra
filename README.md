@@ -82,6 +82,7 @@ sequenceDiagram
 - BE 워크플로는 GHCR 게시가 성공한 뒤 Infra 저장소를 호출합니다. 호출용 GitHub 토큰은 **BE 저장소 Secrets**에 둡니다.
 - Infra 워크플로가 Terraform과 EC2 배포를 실행합니다. 배포 IAM 사용자의 AWS 키는 **Infra 저장소 Secrets**에 둡니다.
 - [`cd-preflight.yml`](.github/workflows/cd-preflight.yml)은 수동 실행 또는 BE의 `deploy-backend` 이벤트로 AWS 접근, state 버킷 리전, S3 backend 초기화, Terraform 형식·구성을 검사합니다. **아직 Terraform apply나 EC2 배포는 하지 않습니다.** 첫 state 객체는 해당 레이어의 첫 `apply` 때 생성됩니다.
+- [`ssm-deploy.yml`](.github/workflows/ssm-deploy.yml)은 Infra `main`에서 수동으로 SSM 연결을 점검하거나 BE 커밋 이미지를 EC2에 배포합니다. Terraform 적용과 실제 배포 검증은 아직 진행되지 않았습니다. [SSM 배포 절차](docs/SSM-DEPLOYMENT.md)를 참고하세요.
 - 테스트 후 인프라 종료는 배포와 별도 절차로 `3_application → 2_storage → 1_base` 순서로 진행합니다. 자세한 결정과 준비 상태는 [CD 준비 문서](docs/DEPLOYMENT-SETUP.md)에 기록합니다.
 
 ## 레이어 구조
@@ -96,8 +97,12 @@ sequenceDiagram
 
 ## 더 알아보기
 
+- 현재 배포 진행 상황과 다음 작업: [`deploy-step.md`](deploy-step.md)
+- AI를 제외한 BE 선배포 범위와 실행 순서: [`docs/BE-ONLY-DEPLOYMENT.md`](docs/BE-ONLY-DEPLOYMENT.md)
+- AWS 계정·IAM 역할·Secrets Manager 개념과 앱 시크릿 등록: [`docs/concepts/README.md`](docs/concepts/README.md)
 - 인프라 구조, 비용 경고, 실행/destroy 순서, 연결 정보 조회, `.env` 작성법: [`docs/GUIDE.md`](docs/GUIDE.md)
 - CD용 AWS 수동 설정 현황과 남은 작업: [`docs/DEPLOYMENT-SETUP.md`](docs/DEPLOYMENT-SETUP.md)
+- 트러블슈팅 기록: [`docs/troubleshooting/README.md`](docs/troubleshooting/README.md)
 - 환경변수·토큰의 관리 주체, 저장 위치, 읽기 권한: [`docs/ENVIRONMENT-VARIABLES.md`](docs/ENVIRONMENT-VARIABLES.md)
 - 배포 관련 설계 결정: [`docs/adr/README.md`](docs/adr/README.md)
 - 애플리케이션이 필요로 하는 환경변수 전체 목록: [42VoiceBridge_BE의 `docs/DEPLOYMENT.md`](https://github.com/42VoiceBridge/42VoiceBridge_BE/blob/develop/docs/DEPLOYMENT.md)

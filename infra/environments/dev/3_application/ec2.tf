@@ -21,6 +21,13 @@ resource "aws_instance" "app" {
   key_name               = var.ssh_key_name
   iam_instance_profile   = aws_iam_instance_profile.app.name
 
+  # Containers need two hops to receive IMDSv2 token responses.
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+
   root_block_device {
     volume_type = "gp3"
     volume_size = 30
@@ -29,9 +36,10 @@ resource "aws_instance" "app" {
   user_data = <<-EOF
     #!/bin/bash
     dnf update -y
-    dnf install -y docker
+    dnf install -y docker jq curl
     systemctl enable docker
     systemctl start docker
+    systemctl enable --now amazon-ssm-agent
     usermod -aG docker ec2-user
   EOF
 
@@ -42,6 +50,12 @@ resource "aws_instance" "app" {
     RedisEndpoint = data.terraform_remote_state.storage.outputs.redis_endpoint
     S3Bucket      = data.terraform_remote_state.storage.outputs.s3_bucket_name
   }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.app_ssm,
+    aws_iam_role_policy.secrets_access,
+    aws_iam_role_policy.s3_access,
+  ]
 }
 
 resource "aws_eip" "app" {

@@ -3,6 +3,11 @@ output "rds_endpoint" {
   value       = aws_db_instance.main.endpoint
 }
 
+output "db_name" {
+  description = "Database name configured on RDS"
+  value       = var.db_name
+}
+
 output "rds_secret_arn" {
   description = "Secrets Manager ARN holding the auto-generated RDS master password"
   value       = aws_db_instance.main.master_user_secret[0].secret_arn

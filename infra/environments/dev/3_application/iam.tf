@@ -14,6 +14,8 @@ resource "aws_iam_role" "app" {
   assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
 }
 
+data "aws_caller_identity" "current" {}
+
 data "aws_iam_policy_document" "s3_access" {
   statement {
     sid       = "ListBucket"
@@ -42,6 +44,14 @@ data "aws_iam_policy_document" "secrets_access" {
     actions   = ["secretsmanager:GetSecretValue"]
     resources = [data.terraform_remote_state.storage.outputs.rds_secret_arn]
   }
+
+  statement {
+    sid     = "ReadAppSecret"
+    actions = ["secretsmanager:GetSecretValue"]
+    resources = [
+      "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.app_secret_name}-*"
+    ]
+  }
 }
 
 resource "aws_iam_role_policy" "secrets_access" {
@@ -53,4 +63,9 @@ resource "aws_iam_role_policy" "secrets_access" {
 resource "aws_iam_instance_profile" "app" {
   name = "${var.project_name}-app-profile"
   role = aws_iam_role.app.name
+}
+
+resource "aws_iam_role_policy_attachment" "app_ssm" {
+  role       = aws_iam_role.app.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
