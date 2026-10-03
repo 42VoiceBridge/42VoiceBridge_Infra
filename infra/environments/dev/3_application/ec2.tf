@@ -5,8 +5,11 @@ data "aws_ami" "al2023" {
   owners      = ["amazon"]
 
   filter {
-    name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    name = "name"
+    # "al2023-ami-*-x86_64" 만으로는 "al2023-ami-ecs-hvm-2023...-x86_64"(ECS 최적화 변종)도
+    # 매칭되고, most_recent 기준으로 그게 뽑힐 수 있다. "ami-" 다음이 버전 숫자로 시작하는
+    # 플레인 AL2023만 받도록 좁힌다.
+    values = ["al2023-ami-2*-x86_64"]
   }
 
   filter {

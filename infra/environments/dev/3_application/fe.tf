@@ -31,7 +31,8 @@ resource "aws_instance" "fe" {
   lifecycle {
     # most_recent AMI는 새 이미지가 나올 때마다 변경으로 보여 인스턴스 교체를 계획한다.
     # 교체(데이터 영향, 재배포)는 의도했을 때만 하도록 AMI 변경은 무시한다. 부팅 시 dnf update로 패치한다.
-    ignore_changes = [ami]
+    # TEMP: AMI 필터 버그로 ECS 최적화 변종이 선택돼 교체가 필요해 잠시 뺐다. 교체 후 복원한다.
+    ignore_changes = []
 
     precondition {
       condition     = startswith(var.fe_private_ip, local.subnet_prefix)
