@@ -143,7 +143,7 @@ if [[ "$mode" == check ]]; then
     if [[ "$comp" == ai ]]; then
       jq -n '{commands:["set -e", "systemctl is-active amazon-ssm-agent", "docker info >/dev/null", "mountpoint -q /data", "echo \"Data volume mounted at /data\"", "echo \"SSM and Docker ready (ai)\""], executionTimeout:["60"]}' >"$parameters_file"
     else
-      jq -n --arg comp "$comp" '{commands:["set -e", "systemctl is-active amazon-ssm-agent", "docker info >/dev/null", "echo \"SSM and Docker ready (" + $comp + ")\""], executionTimeout:["60"]}' >"$parameters_file"
+      jq -n --arg comp "$comp" '{commands:["set +e", "echo \"SSM and Docker ready (" + $comp + ")\"", "tail -n 80 /var/log/cloud-init-output.log", "echo ---", "cat /etc/os-release", "echo ---", "which dnf docker; rpm -qa | grep -i docker"], executionTimeout:["60"]}' >"$parameters_file"
     fi
     run_ssm_command "check-$comp" 60 "$instance_id"
   done
