@@ -38,6 +38,9 @@ jobs:
       - name: run.sh flow tests (stubbed terraform/aws)
         run: bash scripts/ssm/test/run.test.sh
 
+      - name: deploy-ai workflow payload validation tests
+        run: bash scripts/ssm/test/deploy-ai-workflow.test.sh
+
       - name: user_data mount logic tests
         run: bash infra/environments/dev/3_application/tests/user_data_mount.test.sh
 
