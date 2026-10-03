@@ -73,6 +73,13 @@ done
 
 위 개수는 코드에서 센 **예상치**이고 실제 plan의 `Plan: N to add`와 대조해야 한다. 다르면 이유를 확인한다.
 
+### apply 전 사전 확인 (실제 AWS에서 막힐 수 있는 것)
+
+- [ ] **배포 사용자에 DLM 권한이 있는가**(`dlm:CreateLifecyclePolicy` 등). 현재 연결된 정책 7개에는 보이지 않는다(미확인). 없으면 `3_application` apply가 중간에 `AccessDenied`로 멈춘다 → [후속 작업](FOLLOW-UPS.md#1-aws-키)
+- [ ] `SSH_KEY_NAME`의 키 페어가 `ap-northeast-2`에 **이미 존재**하는가(콘솔에서 생성). 없으면 인스턴스 생성에서 실패한다
+- [ ] Infra Variables `SSH_ALLOWED_CIDR`, `SSH_KEY_NAME` 설정(plan 워크플로가 없으면 거부)
+- [ ] PR #10이 `main`에 머지돼 있는가(워크플로가 Actions에 나타나고 apply가 `main`에서만 실행되므로)
+
 ### 위험 신호 (하나라도 있으면 중단하고 확인)
 
 - [ ] plan에 **destroy 또는 replace**가 있다 → 요약에 대상이 나열된다. 첫 배포에서는 0이어야 한다. 이미 인스턴스가 있었다면 의도한 교체인지 확인하고, 데이터 볼륨의 수동 스냅샷을 먼저 만든다
