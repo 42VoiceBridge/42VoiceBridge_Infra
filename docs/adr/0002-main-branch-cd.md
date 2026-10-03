@@ -2,7 +2,8 @@
 
 - 날짜: 2026-10-02
 - 상태: Accepted
-- 구현 상태: Infra에 수동 실행 및 `deploy-backend` 이벤트를 받는 준비 점검 워크플로 추가. BE 이벤트 발송, 인프라 적용 및 앱 배포는 구현 전.
+- 구현 상태: Infra 쪽은 코드로 구현했다(2026-10-03). **BE뿐 아니라 AI·FE도 같은 방식**으로 호출한다: `deploy-backend`/`deploy-ai`/`deploy-frontend` 이벤트를 각각 받는 워크플로, 형식·출처 검증, 락, 인스턴스별 SSM 배포, 레이어별 plan/apply. 송신 쪽은 AI·FE CI가 구현됐고 **BE CI는 미구현**이다. AWS 적용과 실제 이벤트 실행은 전. 자세한 내용은 [CI/CD 흐름](../CICD-FLOW.md), 인스턴스 구성은 [ADR 0006](0006-three-instance-topology.md).
+- 갱신(2026-10-03): 이 ADR의 "Infra CD가 Terraform을 적용한다"는 **자동 apply가 아니다.** 초기 프로비저닝과 인프라 변경은 레이어별 plan/apply 워크플로를 수동으로 실행하고, 이벤트는 서비스 배포(이미지 교체)만 일으킨다. 호출 방식과 토큰 권한은 [후속 작업](../FOLLOW-UPS.md#2-호출-방식과-토큰).
 
 ## 배경
 

@@ -4,11 +4,12 @@
 
 ## 무엇을 저장하는가
 
-AWS Secrets Manager는 API 키·암호·토큰 같은 비밀값을 암호화해 저장하고, 권한이 있는 주체에게 API로 제공하는 서비스다. 이 프로젝트에서는 두 종류의 시크릿을 사용한다.
+AWS Secrets Manager는 API 키·암호·토큰 같은 비밀값을 암호화해 저장하고, 권한이 있는 주체에게 API로 제공하는 서비스다. 이 프로젝트에서는 세 종류의 시크릿을 사용한다.
 
 | 시크릿 | 생성·관리 방법 | 사용하는 값 |
 |---|---|---|
-| 앱 시크릿 `voicebridge/dev/app` | 운영자가 같은 AWS 계정의 서울 리전에 수동 생성·수정 | JWT 비밀값, AI 서버 URL, NCP TTS 키, 필요하면 GHCR 읽기 자격증명 |
+| 앱 시크릿 `voicebridge/dev/app` | 운영자가 같은 AWS 계정의 서울 리전에 수동 생성·수정 | JWT 비밀값, AI 서버 URL, NCP TTS 키. **BE 인스턴스 역할만** 읽는다 |
+| GHCR 시크릿 `voicebridge/dev/ghcr` | 운영자가 수동 생성·수정 | `GHCR_USERNAME`, `GHCR_READ_TOKEN`(classic PAT, `read:packages`). **BE·AI·FE 세 역할이 읽는다.** AI·FE 인스턴스가 BE의 JWT 값을 읽지 못하도록 앱 시크릿과 분리했다 |
 | RDS 관리형 시크릿 | Terraform `2_storage`의 RDS 설정에 따라 RDS가 생성·관리 | DB 사용자 이름과 비밀번호 |
 
 시크릿은 **생성한 IAM 사용자의 개인 보관함이 아니다.** AWS 계정과 리전에 존재하는 자원이다. ARN에도 리전과 AWS 계정 ID가 포함된다. 루트로 만들든 관리자 IAM 사용자로 만들든, 이후 접근 여부는 요청하는 주체의 IAM 권한과 적용된 자원 정책·암호화 키 정책에 따라 결정된다. [AWS: Secrets Manager 접근 제어](https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-access.html)
@@ -19,7 +20,7 @@ AWS Secrets Manager는 API 키·암호·토큰 같은 비밀값을 암호화해 
 flowchart LR
     Admin[루트 또는 관리자 IAM 계정] -->|CreateSecret / PutSecretValue| Secret[Secrets Manager<br/>voicebridge/dev/app]
     GitHub[github-deploy-user<br/>Infra GitHub Actions] -->|Terraform·SSM API 호출| EC2[앱 EC2]
-    Role[voicebridge-app-role<br/>EC2 Instance Profile] -->|GetSecretValue| Secret
+    Role[voicebridge-be-role 등 인스턴스별 역할<br/>EC2 Instance Profile] -->|GetSecretValue| Secret
     EC2 --- Role
 ```
 
@@ -38,18 +39,31 @@ AWS는 루트를 일상 작업에 사용하지 않도록 권장한다. 지금은
    | 필드 | 값의 출처 |
    |---|---|
    | `JWT_SECRET` | 운영자가 만든 충분히 긴 임의의 문자열 |
-   | `AI_SERVER_BASE_URL` | 같은 EC2의 AI 컨테이너 주소 `http://voicebridge-ai:8000`. AI를 제외한 초기 BE 배포에서는 생략 가능 |
+   | `AI_SERVER_BASE_URL` | AI 인스턴스의 고정 사설 IP 주소 `http://10.0.1.20:8000`(`terraform output ai_base_url`). AI를 제외한 초기 BE 배포에서는 생략 가능 |
    | `NCP_TTS_API_KEY_ID` | AI·NAVER API의 CLOVA Voice Application **Client ID** |
    | `NCP_TTS_API_KEY` | 같은 Application의 **Client Secret** |
 
    AWS Secrets Manager의 **Key** 칸에는 위 환경변수 이름을 그대로, **Value** 칸에는 각각의 실제 값을 입력한다. NCP 계정의 **API Authentication Key(Access Key ID / Secret Key)**는 이 두 필드에 넣는 CLOVA Voice 인증 정보가 아니다. CLOVA Voice는 NCP 콘솔의 **AI·NAVER API → Application**에서 발급한 Client ID / Client Secret을 요구한다. [NCP: CLOVA Voice 이용 신청·인증 정보](https://guide.ncloud-docs.com/docs/clovavoice-start), [NCP: 요청 헤더](https://api.ncloud-docs.com/docs/ai-naver-clovavoice)
 
-   GHCR 이미지가 비공개라면 `GHCR_USERNAME`, `GHCR_READ_TOKEN`도 **함께** 입력한다. 공개 이미지라면 생략한다. 입력값을 스크린샷, 문서, Terraform 변수나 GitHub Secrets에 복사하지 않는다.
+   GHCR 자격 증명은 이 시크릿이 아니라 **별도 시크릿 `voicebridge/dev/ghcr`**에 만든다(아래). 전환 기간 동안은 앱 시크릿에 `GHCR_USERNAME`, `GHCR_READ_TOKEN`이 남아 있어도 BE는 폴백으로 읽지만, 새로 만들 때는 앱 시크릿에 넣지 않는다. 입력값을 스크린샷, 문서, Terraform 변수나 GitHub Secrets에 복사하지 않는다.
 4. 암호화 키는 일반적인 동일 계정 사용에 맞춰 기본 **`aws/secretsmanager`**를 선택한다. 별도 고객 관리 KMS 키를 선택하면 EC2 역할에 그 키의 `kms:Decrypt` 권한도 필요하다. [AWS: 시크릿 생성과 암호화 키](https://docs.aws.amazon.com/secretsmanager/latest/userguide/create_secret.html)
 5. 시크릿 이름을 정확히 **`voicebridge/dev/app`**으로 지정한다. 설명은 선택 사항이다. 자동 교체와 타 리전 복제는 현재 앱 시크릿 배포 경로에 구성돼 있지 않으므로 처음 생성할 때 켤 필요가 없다. 검토 화면에서 이름·리전·필드를 확인한 뒤 저장한다.
 6. 목록에 이름이 나타나는지 확인한다. **Retrieve secret value**를 누르면 실제 값이 화면에 표시되므로 화면 공유나 캡처 중에는 누르지 않는다. [AWS: 콘솔에서 값 확인](https://docs.aws.amazon.com/secretsmanager/latest/userguide/retrieving-secrets-console.html)
 
-시크릿을 만들었다고 곧바로 앱이 배포되는 것은 아니다. Terraform `1_base → 2_storage → 3_application`을 적용해 EC2 역할과 권한을 생성한 뒤, [SSM 수동 배포 절차](../SSM-DEPLOYMENT.md)의 `check`와 `deploy`를 실행한다. 기존 AWS 자원 적용 여부와 다음 작업은 [배포 진행표](../../deploy-step.md)에서 추적한다.
+### GHCR 시크릿 만들기 (`voicebridge/dev/ghcr`)
+
+위와 같은 순서로 **Other type of secret**에 두 필드를 넣고 이름을 정확히 `voicebridge/dev/ghcr`로 지정한다.
+
+| 필드 | 값 |
+|---|---|
+| `GHCR_USERNAME` | GitHub 사용자 이름 |
+| `GHCR_READ_TOKEN` | **classic PAT**(`read:packages`). fine-grained PAT는 GHCR 패키지를 지원하지 않는다. BE·AI·FE 세 패키지를 읽을 수 있어야 하고 조직이 SSO를 요구하면 토큰에 SSO 승인이 필요하다 |
+
+- 세 인스턴스 역할이 이 시크릿을 `GetSecretValue`로 읽는다(`3_application/iam.tf`). **AI·FE는 이 시크릿이 없으면 배포되지 않는다.**
+- BE는 이 시크릿이 없거나 비어 있으면 기존 앱 시크릿의 `GHCR_*`로 폴백한다(경고 출력). 이관 순서는 ① `ghcr` 시크릿 생성 ② BE·AI·FE 배포 성공 확인 ③ 앱 시크릿의 `GHCR_*` 필드 제거다. 값만 먼저 옮기고 IAM·스크립트를 나중에 바꾸는 방식으로 하지 않는다(이 설계는 코드와 IAM이 이미 함께 바뀌어 있다).
+- 패키지가 공개라면 만들지 않아도 되지만, AI·FE 배포 스크립트가 시크릿 조회를 시도하므로 빈 객체(`{}`)로라도 만들어 두는 것이 안전하다.
+
+시크릿을 만들었다고 곧바로 앱이 배포되는 것은 아니다. Terraform `1_base → 2_storage → 3_application`을 레이어별로 적용해 인스턴스 역할과 권한을 생성한 뒤, [SSM 수동 배포 절차](../SSM-DEPLOYMENT.md)의 `check`와 `deploy`를 실행한다. 기존 AWS 자원 적용 여부와 다음 작업은 [배포 진행표](../../deploy-step.md)에서 추적한다.
 
 ## 카카오 로그인 키는 지금 어디에 두는가
 
