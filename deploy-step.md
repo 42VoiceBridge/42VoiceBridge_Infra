@@ -71,3 +71,4 @@
 | 2026-10-03 | AI 제외 BE 선배포 범위와 수동 적용·SSM 검증·자동 연동의 순서를 별도 문서에 기록 | [BE 선배포 문서](docs/BE-ONLY-DEPLOYMENT.md) |
 | 2026-10-03 | SSM 구현·배포 문서의 형식과 Terraform 구성을 검증하고 `main`에 커밋·푸시. 실제 AWS 적용은 계속 미완료 | Terraform 세 레이어 `validate`, `fmt -check`, Bash 문법, 워크플로 YAML 검사 |
 | 2026-10-03 | AI 서빙 위치를 같은 EC2의 별도 컨테이너로 확정하고 데이터 볼륨·AI 배포 코드·오프라인 테스트를 구현. AWS 적용과 실측은 전 | [ADR 0005](docs/adr/0005-ai-serving-topology.md), [AI 배포 가이드](docs/AI-DEPLOYMENT.md) |
+| 2026-10-03 | AI팀 전달 반영: `deploy-ai` 이벤트 수신 워크플로 추가(payload는 SHA만 신뢰, 이미지는 Infra 변수로 조립), AI 데이터 디렉터리 `enroll`·`jobs` 및 소유권(uid 10001) 보정, `ALLOW_CPU_TRAIN=1` 전달, ADR 0005에 CPU 학습 정정과 메모리 실측(517 MiB 대기, 1.67 GiB 전사 3건 후) 반영. `main` 반영 전에는 이벤트가 워크플로를 실행하지 않음 | [deploy-ai.yml](.github/workflows/deploy-ai.yml), [ADR 0005](docs/adr/0005-ai-serving-topology.md), AI 저장소 `docs/INFRA_AI_배포_정보_2026-10-03.md` |

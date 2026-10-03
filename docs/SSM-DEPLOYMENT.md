@@ -41,4 +41,8 @@ GitHub Actions → **SSM deploy (manual)** → `Run workflow`에서 `main`을 �
 
 실패 시 Actions 로그의 SSM command ID로 AWS Systems Manager의 Run Command 실행 결과를 확인한다. 새 컨테이너의 실행 또는 HTTP 응답 확인이 실패하면 스크립트가 이전 컨테이너를 복원한다. 앱 시크릿과 RDS 시크릿 값은 SSM 명령이나 Actions 로그에 출력하지 않는다.
 
-BE `main` → Infra 이벤트 자동 연결과 Terraform `apply` 워크플로는 아직 별도 작업이다. 현재 `repository_dispatch`는 [준비 점검](../.github/workflows/cd-preflight.yml)만 실행한다.
+## 이벤트로 받는 배포
+
+- **AI:** [`deploy-ai.yml`](../.github/workflows/deploy-ai.yml)이 AI 저장소 CI의 `deploy-ai` 이벤트(`client_payload`: `ref`, `sha`, `image`)를 받아 AI 컨테이너만 교체한다. `ref`는 `refs/heads/main`, `sha`는 40자 소문자여야 한다. 이미지는 payload가 아니라 Infra의 Variables `AI_IMAGE_REPOSITORY`와 SHA로 조립하고, payload의 `image`는 설정 불일치 확인용이라 다르면 배포하지 않는다. `repository_dispatch`는 기본 브랜치(`main`)의 워크플로만 실행하므로 이 워크플로가 `main`에 있어야 동작한다.
+- **BE:** `deploy-backend` 이벤트는 아직 [준비 점검](../.github/workflows/cd-preflight.yml)만 실행하고 배포하지 않는다. BE 배포 워크플로는 별도 작업이다. BE와 AI 이벤트를 섞지 않도록 타입을 분리한다(`cd-preflight`는 SHA를 BE 커밋으로 검증한다).
+- Terraform `apply` 워크플로(초기 VPC·S3·EC2 배포)는 아직 없다.

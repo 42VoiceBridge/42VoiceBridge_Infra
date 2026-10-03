@@ -10,6 +10,8 @@ EC2 m5.large (루트 EBS 40 GiB gp3)
 │   └─ ai/
 │       ├─ hf/                 Hugging Face 모델 캐시   → 컨테이너 /data/hf
 │       ├─ adapters/           개인화 LoRA 어댑터       → 컨테이너 /data/adapters
+│       ├─ enroll/             등록 음성 수신 데이터    → 컨테이너 /data/enroll
+│       ├─ jobs/               학습 작업 상태           → 컨테이너 /data/jobs
 │       └─ script_pool.json    프롬프트 풀(수동 업로드) → 컨테이너 /data/script_pool.json
 └─ Docker 네트워크 "voicebridge"
     ├─ voicebridge-be   호스트 80 → 8080 게시
@@ -22,7 +24,8 @@ EC2 m5.large (루트 EBS 40 GiB gp3)
 | 헬스체크 | 호스트에서 컨테이너 IP로 `GET /v1/health` → 200 | 5초 × 120회 = 최대 600초. 근거는 ADR 0005 |
 | 재시작 정책 | `unless-stopped` | EC2 재부팅 후 자동 기동. AI 모델 로딩이 끝나기 전에는 BE의 AI 호출이 실패할 수 있다 |
 | 로그 | json-file 10 MB × 3 | 디스크가 차지 않도록 순환 |
-| 컨테이너 환경변수 | `HF_HOME=/data/hf` | 그 외는 AI 이미지의 기본값을 따른다(아래 "확인 필요" 참고) |
+| 컨테이너 환경변수 | `HF_HOME=/data/hf`, `ALLOW_CPU_TRAIN=1` | 나머지(`HOST=0.0.0.0`, `PORT=8000`, `ASR_ADAPTERS`, `PROMPT_POOL`, `ENROLL_DIR`, `JOB_DIR`)는 AI 이미지의 Dockerfile이 지정한다. `ALLOW_CPU_TRAIN`이 없으면 CPU에서 학습기가 실행을 거부한다 |
+| 실행 사용자 | uid 10001(비루트) | 앱이 `/data` 아래에 직접 디렉터리를 만들므로 배포 스크립트가 `/data/ai`와 하위 디렉터리를 이 사용자 소유로 맞춘다 |
 | IAM | **변경 없음** | 모델은 HF에서 받고 S3는 쓰지 않는다. 프롬프트 풀 전달만 기존 앱 버킷 권한(`GetObject`)을 쓴다 |
 
 `/data`가 마운트돼 있지 않으면 AI 배포는 이미지 pull 전에 거부된다. 루트 디스크에 조용히 쓰면 EC2 교체 때 모델 캐시와 어댑터가 사라지기 때문이다.
@@ -43,7 +46,7 @@ EC2 m5.large (루트 EBS 40 GiB gp3)
   - 토큰에 `read:packages` 범위가 있고, 소유 조직이 SSO를 요구하면 토큰에 SSO 승인이 되어 있는가?
   - `42voicebridge_ai` 패키지가 비공개라면 이 토큰의 사용자가 패키지 읽기 권한(조직 멤버십 또는 패키지 접근 설정)을 갖는가? 공개 패키지면 두 필드는 필요 없다.
   - **확인하지 않고 배포하면 첫 배포에서 `docker pull` 인증 실패로 드러날 수 있다.** 이 경우 AI 배포는 BE를 건드리지 않고 실패한다.
-- [ ] **AI 이미지 환경변수 확인(확인 필요):** 현재 스크립트는 `HF_HOME`만 지정한다. AI 이미지가 별도 환경변수(예: 모델 리비전 고정, `ALLOW_CPU_TRAIN` 등)를 요구하는지 AI팀에 확인한다. 필요하면 `deploy-ec2.sh`의 `ai` 분기에 추가한다.
+- [x] **AI 이미지 환경변수 확인:** AI 레포 Dockerfile 기준으로 필요한 값은 이미지가 지정하고, 배포 스크립트는 `HF_HOME`과 `ALLOW_CPU_TRAIN=1`만 추가한다(AI팀 확인 2026-10-03).
 - [ ] AI 저장소 `main`의 `sha-<40자>` 이미지가 GHCR에 게시됐는지 확인한다.
 
 ### C. 배포 순서
@@ -111,6 +114,7 @@ AWS 자격 증명 없이 다음을 실행할 수 있다. [infra-tests 워크플�
 shellcheck -x scripts/ssm/*.sh scripts/ssm/test/*.sh infra/environments/dev/3_application/tests/*.sh
 bash scripts/ssm/test/deploy-ec2.test.sh                                   # EC2 배포 스크립트(스텁 docker/aws)
 bash scripts/ssm/test/run.test.sh                                          # Actions 쪽 run.sh 흐름(스텁 terraform/aws)
+bash scripts/ssm/test/deploy-ai-workflow.test.sh                           # deploy-ai 이벤트 payload 검증
 bash infra/environments/dev/3_application/tests/user_data_mount.test.sh   # 볼륨 포맷·마운트 분기
 cd infra/environments/dev/3_application && terraform init -backend=false && terraform test
 ```
