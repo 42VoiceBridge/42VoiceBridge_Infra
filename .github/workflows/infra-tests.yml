@@ -1,0 +1,57 @@
+name: Infra tests (offline)
+
+# AWS 자격 증명 없이 실행되는 검사만 모은다: shellcheck, 배포 스크립트 동작 테스트(스텁),
+# Terraform 포맷·validate·mock 프로바이더 테스트. 배포나 apply는 하지 않는다.
+'on':
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'infra/**'
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'infra/**'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: shellcheck
+        run: |
+          shellcheck -x scripts/ssm/*.sh scripts/ssm/test/*.sh \
+            infra/environments/dev/3_application/tests/*.sh
+
+      - name: Deploy script tests (stubbed docker/aws)
+        run: bash scripts/ssm/test/deploy-ec2.test.sh
+
+      - name: run.sh flow tests (stubbed terraform/aws)
+        run: bash scripts/ssm/test/run.test.sh
+
+      - name: user_data mount logic tests
+        run: bash infra/environments/dev/3_application/tests/user_data_mount.test.sh
+
+      - uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: 1.15.3
+          terraform_wrapper: false
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive infra/environments/dev
+
+      - name: 3_application validate and mock tests
+        working-directory: infra/environments/dev/3_application
+        run: |
+          terraform init -backend=false -lockfile=readonly -input=false
+          terraform validate -no-color
+          terraform test -no-color

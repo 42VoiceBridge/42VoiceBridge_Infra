@@ -4,13 +4,17 @@ name: SSM deploy (manual)
   workflow_dispatch:
     inputs:
       mode:
-        description: Check SSM connectivity or deploy a BE main commit
+        description: Check SSM connectivity or deploy BE/AI main commits
         required: true
         type: choice
         options: [check, deploy]
         default: check
       be_sha:
-        description: Full 40-character BE main commit SHA (required for deploy)
+        description: Full 40-character BE main commit SHA (deploy needs be_sha and/or ai_sha)
+        required: false
+        type: string
+      ai_sha:
+        description: Full 40-character AI main commit SHA. AI deploys first; if it fails BE is left untouched
         required: false
         type: string
 
@@ -25,12 +29,13 @@ jobs:
   ssm:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       AWS_REGION: ap-northeast-2
       TF_IN_AUTOMATION: 'true'
       DEPLOY_MODE: ${{ inputs.mode }}
       BE_SHA: ${{ inputs.be_sha }}
+      AI_SHA: ${{ inputs.ai_sha }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -46,4 +51,4 @@ jobs:
           terraform_wrapper: false
       - name: Check or deploy through SSM
         shell: bash
-        run: bash scripts/ssm/run.sh "$DEPLOY_MODE" "$BE_SHA"
+        run: bash scripts/ssm/run.sh "$DEPLOY_MODE" "$BE_SHA" "$AI_SHA"
