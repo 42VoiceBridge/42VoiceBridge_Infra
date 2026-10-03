@@ -144,6 +144,29 @@ run "데이터_볼륨과_스냅샷_정책" {
   }
 }
 
+run "스냅샷_ID를_주면_그_스냅샷에서_볼륨을_만든다" {
+  command = plan
+
+  variables {
+    data_snapshot_id = "snap-0123456789abcdef0"
+  }
+
+  assert {
+    condition     = aws_ebs_volume.data.snapshot_id == "snap-0123456789abcdef0"
+    error_message = "data_snapshot_id를 주면 볼륨이 그 스냅샷에서 복원돼야 한다."
+  }
+}
+
+run "잘못된_스냅샷_ID_형식은_거부된다" {
+  command = plan
+
+  variables {
+    data_snapshot_id = "vol-0123456789abcdef0"
+  }
+
+  expect_failures = [var.data_snapshot_id]
+}
+
 run "IAM_정책은_역할마다_최소_권한이다" {
   command = plan
 

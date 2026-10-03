@@ -96,6 +96,7 @@ echo "plan: 저장·요약·잠금 유지"
 setup; STUB_APPLIED="1_base 2_storage" T plan 3_application "$work/plan"
 check "종료코드 0" rc_is 0
 check "저장된 plan 파일과 메타데이터 생성" test -f "$work/plan/tfplan" -a -f "$work/plan/meta.json" -a -f "$work/plan/plan.txt"
+check "민감값이 들어갈 수 있는 JSON 플랜은 아티팩트 디렉터리에 남기지 않음" test ! -e "$work/plan/plan.json"
 check "메타데이터에 레이어와 커밋과 체크섬" bash -c "jq -e '.layer==\"3_application\" and (.commit|length==40) and (.tfplan_sha256|length==64) and .has_changes==true' '$work/plan/meta.json' >/dev/null"
 check "잠금을 끄지 않음(-lock=false 금지)" bash -c "! grep -q -- '-lock=false' '$STUB_STATE/tf.log'"
 check "잠금 대기 시간 지정(-lock-timeout)" tf_log_has "-lock-timeout=5m"

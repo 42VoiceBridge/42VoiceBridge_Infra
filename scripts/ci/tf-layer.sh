@@ -89,9 +89,12 @@ if [[ "$mode" == plan ]]; then
   [[ "$rc" -eq 2 ]] && has_changes=true
 
   terraform -chdir="$dir" show -no-color "$plan_dir/tfplan" >"$plan_dir/plan.txt"
-  terraform -chdir="$dir" show -json "$plan_dir/tfplan" >"$plan_dir/plan.json"
+  # JSON 플랜은 민감값을 마스킹하지 않을 수 있으므로 파괴 감지에만 쓰고 아티팩트(PLAN_DIR)에는 남기지 않는다.
+  plan_json=$(mktemp)
+  terraform -chdir="$dir" show -json "$plan_dir/tfplan" >"$plan_json"
   jq -r '.resource_changes[]? | select(.change.actions | index("delete")) | "\(.address) [\(.change.actions | join(","))]"' \
-    "$plan_dir/plan.json" >"$plan_dir/destroys.txt"
+    "$plan_json" >"$plan_dir/destroys.txt"
+  rm -f -- "$plan_json"
   destroy_count=$(wc -l <"$plan_dir/destroys.txt" | tr -d ' ')
 
   jq -n --arg layer "$layer" --arg commit "$(current_commit)" \

@@ -35,6 +35,10 @@ resource "aws_instance" "be" {
   }
 
   lifecycle {
+    # most_recent AMI는 새 이미지가 나올 때마다 변경으로 보여 인스턴스 교체를 계획한다.
+    # 교체(데이터 영향, 재배포)는 의도했을 때만 하도록 AMI 변경은 무시한다. 부팅 시 dnf update로 패치한다.
+    ignore_changes = [ami]
+
     precondition {
       condition     = startswith(var.be_private_ip, local.subnet_prefix)
       error_message = "be_private_ip must be inside the public subnet CIDR."

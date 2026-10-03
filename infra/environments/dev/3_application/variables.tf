@@ -54,6 +54,17 @@ variable "data_volume_size_gb" {
   default     = 20
 }
 
+variable "data_snapshot_id" {
+  description = "Restore the AI data volume from this snapshot (snap-...) when the volume is (re)created. Empty = create a blank volume. Changing it on an existing volume forces replacement, which prevent_destroy blocks on purpose (see docs/DATA-PROTECTION.md)"
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.data_snapshot_id == "" || can(regex("^snap-[0-9a-f]{8,17}$", var.data_snapshot_id))
+    error_message = "data_snapshot_id must be empty or look like snap-0123456789abcdef0."
+  }
+}
+
 variable "data_snapshot_retention" {
   description = "Number of daily DLM snapshots of the AI data volume to keep"
   type        = number
