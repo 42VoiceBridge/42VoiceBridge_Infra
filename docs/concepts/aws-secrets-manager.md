@@ -38,7 +38,7 @@ AWS는 루트를 일상 작업에 사용하지 않도록 권장한다. 지금은
    | 필드 | 값의 출처 |
    |---|---|
    | `JWT_SECRET` | 운영자가 만든 충분히 긴 임의의 문자열 |
-   | `AI_SERVER_BASE_URL` | AI 서버 배포 후 실제 접근 주소. AI를 제외한 초기 BE 배포에서는 생략 가능 |
+   | `AI_SERVER_BASE_URL` | 같은 EC2의 AI 컨테이너 주소 `http://voicebridge-ai:8000`. AI를 제외한 초기 BE 배포에서는 생략 가능 |
    | `NCP_TTS_API_KEY_ID` | AI·NAVER API의 CLOVA Voice Application **Client ID** |
    | `NCP_TTS_API_KEY` | 같은 Application의 **Client Secret** |
 

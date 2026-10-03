@@ -21,6 +21,6 @@
 4. 예상 비용과 Terraform 입력을 확인한 뒤 `1_base → 2_storage → 3_application` 순서로 `plan`·`apply`한다. 현재 `ssh_key_name`과 제한된 `ssh_allowed_cidr` 입력은 여전히 필요하다. 이 단계는 현재 수동이며 [SSM 워크플로](SSM-DEPLOYMENT.md)가 인프라를 만들지 않는다.
 5. Infra Actions의 **SSM deploy (manual)**에서 `mode=check`를 실행해 EC2의 SSM 등록과 Docker 준비를 확인한다. 이어 `mode=deploy`에 BE `main` 이미지의 전체 SHA를 넣어 배포한다. HTTP 응답 확인은 약한 검사이므로 DB 연결과 핵심 BE 기능을 별도로 확인한다.
 6. 수동 배포가 검증되면 Infra의 Terraform `plan`·`apply` 실행과 BE `main` 이미지 게시 성공 후 `repository_dispatch` 호출을 연결한다. 호출용 `INFRA_DISPATCH_TOKEN`은 **BE 저장소 Secrets**에 둔다. AWS 키는 Infra 저장소 Secrets에 둔다.
-7. 짧은 테스트를 마치면 `3_application → 2_storage → 1_base` 순서로 `destroy`한다. EC2만 중지해도 RDS, Redis, 스토리지 비용은 계속 발생할 수 있다. state 버킷은 모든 레이어 정리와 state 확인이 끝날 때까지 유지한다.
+7. 짧은 테스트를 마치면 `3_application → 2_storage → 1_base` 순서로 `destroy`한다. 단 `3_application`의 데이터 EBS 볼륨에는 `prevent_destroy`가 걸려 있어 단순 `terraform destroy`는 중단된다. 삭제 방법은 [AI 배포 가이드](AI-DEPLOYMENT.md#데이터-볼륨-삭제와-비용-정리)를 따른다. EC2만 중지해도 RDS, Redis, 스토리지 비용은 계속 발생할 수 있다. state 버킷은 모든 레이어 정리와 state 확인이 끝날 때까지 유지한다.
 
-AI 배포는 [ADR 0005](adr/0005-ai-serving-topology.md)에 따라 별도로 결정한다. AI 서비스 주소가 생기면 앱 시크릿에 `AI_SERVER_BASE_URL`을 추가하고 BE와의 연결을 검증한다. 진행 여부와 완료 근거는 [배포 진행표](../deploy-step.md)에 갱신한다.
+AI는 [ADR 0005](adr/0005-ai-serving-topology.md)에 따라 같은 EC2의 별도 컨테이너로 배포한다. 절차는 [AI 배포 가이드](AI-DEPLOYMENT.md)에 있다. AI 배포 후 앱 시크릿에 `AI_SERVER_BASE_URL=http://voicebridge-ai:8000`을 추가하고 BE를 다시 배포해 연결을 검증한다. 진행 여부와 완료 근거는 [배포 진행표](../deploy-step.md)에 갱신한다.

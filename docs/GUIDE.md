@@ -141,6 +141,11 @@ cd ../2_storage && terraform destroy
 cd ../1_base && terraform destroy
 ```
 
+> **`3_application`의 데이터 EBS 볼륨(`/data`, AI 모델 캐시·어댑터)에는 `prevent_destroy`가 걸려 있어
+> 위 첫 번째 `terraform destroy`는 오류로 중단됩니다.** 데이터를 보존하며 EC2 비용만 멈추는 방법과
+> 완전히 삭제하는 방법은 [AI 배포 가이드](AI-DEPLOYMENT.md#데이터-볼륨-삭제와-비용-정리)를 따르세요.
+> 볼륨을 남겨 둔 동안에도 월 약 $2 안팎의 EBS 비용이 발생합니다.
+
 **절대 잊지 마세요.** 위 비용 경고 참고 — `apply` 상태를 며칠만 방치해도
 비용이 크게 늘어날 수 있습니다.
 

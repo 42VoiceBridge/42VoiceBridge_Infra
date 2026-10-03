@@ -14,7 +14,8 @@
 - [x] 운영자 확인: 서울 리전 Secrets Manager에 CLOVA Voice Client ID·Client Secret 및 JWT 서명용 값 3개를 등록. 시크릿 이름·필드명·값 자체는 이 저장소에서 확인하지 않음.
 - [x] AI를 제외한 초기 BE 배포에서는 SSM 스크립트가 `AI_SERVER_BASE_URL` 없이 동작하도록 변경. AI 의존 기능은 AI 서버 배포 전까지 사용할 수 없다.
 - [x] AI를 제외한 BE 선배포 범위·선행 조건·실행 순서를 [별도 문서](docs/BE-ONLY-DEPLOYMENT.md)에 정리.
-- [ ] AI 저장소의 HTTP 추론·등록 음성 수신·학습 작업 코드는 갱신됐지만 AWS 배포 전. 독립 AI 이미지, 모델 아티팩트 전달, BE와의 네트워크 연결 및 CPU 실행 자원 측정이 필요. GPU는 현재 계획에 포함하지 않음. [ADR 0005](docs/adr/0005-ai-serving-topology.md)
+- [x] [ADR 0005](docs/adr/0005-ai-serving-topology.md)를 Accepted로 확정: AI는 같은 EC2의 별도 컨테이너. 데이터 EBS 볼륨(gp3 20 GiB, `/data`), 루트 40 GiB, Docker 네트워크 `voicebridge`, SSM의 AI 배포 컴포넌트, `/v1/health` 헬스체크를 코드로 구현하고 오프라인 테스트로 검증했다. [AI 배포 가이드](docs/AI-DEPLOYMENT.md)
+- [ ] AI 컨테이너의 AWS 적용·실제 배포는 전. 남은 것: `terraform plan`(AWS 자격 증명 필요) 검토·승인 후 `apply`, GHCR 토큰 종류·권한 확인, `script_pool.json` 수동 업로드, 같은 `m5.large`에서 BE+AI 메모리 실측. GPU는 현재 계획에 포함하지 않음.
 - [x] EC2 역할의 `AmazonSSMManagedInstanceCore` 연결, 앱 시크릿 읽기 권한, SSM 수동 배포 워크플로와 스크립트를 로컬 코드에 구현. [SSM 배포 절차](docs/SSM-DEPLOYMENT.md). 적용·실제 연결 검증은 아직 전.
 - [ ] SSH와 SSM 중 최종 접속·배포 방식 결정. [ADR 0004](docs/adr/0004-ec2-access-method.md)는 `Pending`.
 - [ ] Terraform `apply`, EC2 생성, SSM 관리 대상 등록, 앱 배포는 아직 확인되지 않음. SSM 수동 워크플로는 `apply`하지 않으며 배포 코드는 미실증.
@@ -30,7 +31,8 @@
 
 - [x] 운영자 확인: NCP CLOVA Voice 인증 정보 두 개와 JWT 서명용 값을 서울 리전 Secrets Manager에 등록했다. BE 서버용 카카오 API 키 환경변수는 없다.
 - [ ] 시크릿 이름이 `voicebridge/dev/app`인지, 키가 `NCP_TTS_API_KEY_ID`, `NCP_TTS_API_KEY`, `JWT_SECRET`인지 확인한다. `AI_SERVER_BASE_URL`은 AI 서버 배포 후 추가한다. 실제 값은 코드, Terraform 변수, GitHub 로그에 넣지 않는다.
-- [ ] AI팀과 모델 아티팩트 보관 위치·사용 권한·실행 의존성·CPU/GPU 요구사항을 확인한다. AI 서비스를 배포한 뒤 실제 내부 주소를 `AI_SERVER_BASE_URL`에 등록한다. BE 컨테이너 안의 `127.0.0.1`을 AI 주소로 사용하지 않는다.
+- [x] AI 모델 아티팩트 조사: 베이스 모델은 런타임에 Hugging Face에서 받고 어댑터·프롬프트 풀은 로컬 디스크에만 있어 새 IAM이 필요 없다. 프롬프트 풀(`script_pool.json`)은 AI팀 내부 파일이라 배포 전에 수동 업로드가 필요하다.
+- [ ] AI 배포 후 `AI_SERVER_BASE_URL`을 `http://voicebridge-ai:8000`으로 등록하고 BE를 다시 배포한다. BE 컨테이너 안의 `127.0.0.1`을 AI 주소로 사용하지 않는다. AI 이미지가 `HF_HOME` 외에 요구하는 환경변수가 있는지 AI팀에 확인한다.
 - [ ] CPU 추론과 BE 연결부터 테스트한다. 사용자별 어댑터 학습은 AI 코드에서 GPU가 기본 요구사항이며 CPU 모드는 짧은 테스트용이므로 실제 CPU 학습 시간·메모리를 확인하기 전 배포 완료로 표시하지 않는다.
 - [x] EC2 앱 역할에 `voicebridge/dev/app`의 `secretsmanager:GetSecretValue` 권한을 코드로 추가했다. 실제 적용은 아직 전. [환경변수 명세](docs/ENVIRONMENT-VARIABLES.md)
 - [ ] GHCR 패키지 공개 여부를 확인한다. 비공개라면 EC2의 이미지 읽기 인증 방법을 준비한다.
@@ -68,3 +70,4 @@
 | 2026-10-03 | AI 제외 초기 BE 배포를 위해 SSM 스크립트에서 `AI_SERVER_BASE_URL`을 선택값으로 변경. 나머지 앱 시크릿 필드 세 개는 계속 필수 | [SSM 배포 스크립트](scripts/ssm/deploy-ec2.sh), [SSM 절차](docs/SSM-DEPLOYMENT.md) |
 | 2026-10-03 | AI 제외 BE 선배포 범위와 수동 적용·SSM 검증·자동 연동의 순서를 별도 문서에 기록 | [BE 선배포 문서](docs/BE-ONLY-DEPLOYMENT.md) |
 | 2026-10-03 | SSM 구현·배포 문서의 형식과 Terraform 구성을 검증하고 `main`에 커밋·푸시. 실제 AWS 적용은 계속 미완료 | Terraform 세 레이어 `validate`, `fmt -check`, Bash 문법, 워크플로 YAML 검사 |
+| 2026-10-03 | AI 서빙 위치를 같은 EC2의 별도 컨테이너로 확정하고 데이터 볼륨·AI 배포 코드·오프라인 테스트를 구현. AWS 적용과 실측은 전 | [ADR 0005](docs/adr/0005-ai-serving-topology.md), [AI 배포 가이드](docs/AI-DEPLOYMENT.md) |

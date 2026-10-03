@@ -24,7 +24,7 @@
 | `S3_BUCKET` | Terraform이 생성 | `2_storage`의 `s3_bucket_name` output → EC2 환경변수 | EC2 앱 역할에 해당 앱 버킷의 객체 읽기·쓰기 권한은 **현재 Terraform에 정의됨**. state 버킷 이름을 넣지 않음 |
 | `AWS_REGION` | 인프라 설정 담당자 | Terraform의 `aws_region`과 동일하게 지정. 현재 기본값 `ap-northeast-2` | EC2 앱이 S3 클라이언트 리전으로 사용. **코드 구현, 실행 미확인** |
 | `JWT_SECRET` | 배포 관리자가 생성·교체 | AWS Secrets Manager `voicebridge/dev/app` → EC2에서 조회 후 환경변수 | 운영자 확인: 값 등록 완료. **시크릿 이름·필드명 및 역할 적용 미확인** |
-| `AI_SERVER_BASE_URL` | AI팀이 실제 배포 주소 제공, 배포 관리자가 등록 | AWS Secrets Manager `voicebridge/dev/app` → EC2 환경변수. **AI 제외 초기 BE 배포에서는 생략 가능** | 실제 AI 주소가 없으면 AI 의존 기능은 작동하지 않음. BE의 `127.0.0.1:8000` 기본값은 컨테이너 안에서 AI 서버를 찾지 못함 |
+| `AI_SERVER_BASE_URL` | 같은 EC2의 AI 컨테이너 주소 `http://voicebridge-ai:8000`(ADR 0005). 배포 관리자가 등록 | AWS Secrets Manager `voicebridge/dev/app` → EC2 환경변수. **AI 제외 초기 BE 배포에서는 생략 가능** | 실제 AI 주소가 없으면 AI 의존 기능은 작동하지 않음. BE의 `127.0.0.1:8000` 기본값은 컨테이너 안에서 AI 서버를 찾지 못함. BE는 시작 시점에만 값을 읽으므로 변경 후 BE를 다시 배포해야 함 |
 | `NCP_TTS_API_KEY_ID`, `NCP_TTS_API_KEY` | NCP **AI·NAVER API → Application**의 CLOVA Voice Client ID / Client Secret을 발급·교체, AWS 관리자가 앱용 시크릿에 등록 | AWS Secrets Manager `voicebridge/dev/app` → EC2 환경변수. NCP 계정의 API Authentication Key(Access Key ID / Secret Key)와 구별 | 운영자 확인: 값 두 개 등록 완료. **시크릿 이름·필드명 및 역할 적용 미확인**. GitHub Secrets에 둘 값이 아님 |
 | `FFMPEG_PATH`, `FFPROBE_PATH` | 이미지·런타임 설정 담당자 | 현재 BE 설정 기본값은 각각 `ffmpeg`, `ffprobe`. 기본 경로가 유효하면 별도 환경변수 불필요 | EC2 컨테이너 내부 프로그램 경로. 비밀값 아님 |
 
