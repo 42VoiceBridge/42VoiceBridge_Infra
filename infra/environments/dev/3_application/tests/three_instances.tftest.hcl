@@ -78,8 +78,8 @@ run "세_인스턴스는_기본_사양과_고정_사설_IP를_갖는다" {
     error_message = "BE, AI, FE는 고정 사설 IP(10/20/30)를 가져야 한다."
   }
   assert {
-    condition     = aws_instance.be.instance_type == "m5.large" && aws_instance.ai.instance_type == "m5.xlarge" && aws_instance.fe.instance_type == "t3.small"
-    error_message = "초기 시험 사양은 BE m5.large, AI m5.xlarge, FE t3.small이다."
+    condition     = aws_instance.be.instance_type == "t3.small" && aws_instance.ai.instance_type == "t3.small" && aws_instance.fe.instance_type == "t3.small"
+    error_message = "현재 시험 사양은 Free Tier 제한으로 BE/AI/FE 모두 t3.small이다(docs/FOLLOW-UPS.md, 정식 사양 미확정)."
   }
   assert {
     condition     = aws_instance.be.root_block_device[0].volume_size == 30 && aws_instance.ai.root_block_device[0].volume_size == 40 && aws_instance.fe.root_block_device[0].volume_size == 30
@@ -259,7 +259,7 @@ run "user_data는_AI에만_볼륨_마운트를_넣는다" {
     error_message = "BE와 FE에는 데이터 볼륨 마운트 로직이 없어야 한다."
   }
   assert {
-    condition     = alltrue([for u in [aws_instance.be.user_data, aws_instance.ai.user_data, aws_instance.fe.user_data] : strcontains(u, "amazon-ssm-agent") && strcontains(u, "dnf install -y docker")])
+    condition     = alltrue([for u in [aws_instance.be.user_data, aws_instance.ai.user_data, aws_instance.fe.user_data] : strcontains(u, "amazon-ssm-agent") && strcontains(u, "dnf install -y --allowerasing docker")])
     error_message = "세 인스턴스 모두 Docker와 SSM 에이전트를 설치해야 한다."
   }
 }
