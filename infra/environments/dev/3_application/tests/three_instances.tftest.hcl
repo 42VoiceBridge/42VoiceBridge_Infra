@@ -215,6 +215,10 @@ run "출력_주소가_고정값으로_조립된다" {
 run "도메인이_없으면_EIP_공개_DNS를_쓴다" {
   command = apply
 
+  variables {
+    fe_domain = ""
+  }
+
   assert {
     condition     = output.fe_public_host == "ec2-203-0-113-10.ap-northeast-2.compute.amazonaws.com"
     error_message = "fe_domain이 비어 있으면 EIP의 공개 DNS 이름을 써야 한다."
