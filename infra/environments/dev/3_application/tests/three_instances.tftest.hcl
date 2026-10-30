@@ -78,8 +78,8 @@ run "세_인스턴스는_기본_사양과_고정_사설_IP를_갖는다" {
     error_message = "BE, AI, FE는 고정 사설 IP(10/20/30)를 가져야 한다."
   }
   assert {
-    condition     = aws_instance.be.instance_type == "t3.small" && aws_instance.ai.instance_type == "t3.small" && aws_instance.fe.instance_type == "t3.small"
-    error_message = "현재 시험 사양은 Free Tier 제한으로 BE/AI/FE 모두 t3.small이다(docs/FOLLOW-UPS.md, 정식 사양 미확정)."
+    condition     = aws_instance.be.instance_type == "t3.small" && aws_instance.ai.instance_type == "m7i-flex.large" && aws_instance.fe.instance_type == "t3.small"
+    error_message = "데모 사양은 BE t3.small, AI m7i-flex.large, FE t3.small이다(docs/OPERATIONS-SIZING.md)."
   }
   assert {
     condition     = aws_instance.be.root_block_device[0].volume_size == 30 && aws_instance.ai.root_block_device[0].volume_size == 40 && aws_instance.fe.root_block_device[0].volume_size == 30

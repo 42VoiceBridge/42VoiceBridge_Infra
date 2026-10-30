@@ -19,9 +19,9 @@ variable "be_instance_type" {
 }
 
 variable "ai_instance_type" {
-  description = "EC2 instance type for the AI instance. Initial trial size: 4 vCPU for CPU training headroom; confirm with measurements"
+  description = "EC2 instance type for the AI instance. Demo size: 8 GiB for inference plus CPU training headroom; confirm with measurements"
   type        = string
-  default     = "t3.small"
+  default     = "m7i-flex.large"
 }
 
 variable "fe_instance_type" {

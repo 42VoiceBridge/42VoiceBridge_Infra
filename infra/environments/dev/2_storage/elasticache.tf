@@ -12,6 +12,7 @@ resource "aws_elasticache_cluster" "main" {
   port               = 6379
   subnet_group_name  = aws_elasticache_subnet_group.main.name
   security_group_ids = [data.terraform_remote_state.base.outputs.redis_sg_id]
+  apply_immediately  = true
 
   tags = {
     Name = "${var.project_name}-redis"
