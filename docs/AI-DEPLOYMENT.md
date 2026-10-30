@@ -1,11 +1,11 @@
 # AI 인스턴스 배포 가이드
 
-[ADR 0006](adr/0006-three-instance-topology.md)에 따라 AI 추론 서버는 **전용 EC2**에서 실행한다(예전의 같은 EC2 구성은 [ADR 0005](adr/0005-ai-serving-topology.md)가 대체됨). 2026-10-03 기준으로 코드와 오프라인 테스트까지 끝났고 **AWS에는 적용하지 않았다.** AI 서버의 사실(이미지·포트·메모리 실측)은 AI 레포의 `docs/INFRA_AI_배포_정보_2026-10-03.md`와 Dockerfile을 읽어 확인했다.
+[ADR 0006](adr/0006-three-instance-topology.md)에 따라 AI 추론 서버는 **전용 EC2**에서 실행한다(예전의 같은 EC2 구성은 [ADR 0005](adr/0005-ai-serving-topology.md)가 대체됨). 2026-10-03에 AWS에 적용했고 SSM `check`로 `/data` 마운트까지 확인했다. 2026-10-30에 인스턴스를 데모 사양 `m7i-flex.large`(8 GiB)로 올렸다([사양·비용](OPERATIONS-SIZING.md)). AI 서버의 사실(이미지·포트·메모리 실측)은 AI 레포의 `docs/INFRA_AI_배포_정보_2026-10-03.md`와 Dockerfile을 읽어 확인했다.
 
 ## 구성
 
 ```
-AI 인스턴스 (EC2, 초기 시험 사양 m5.xlarge, root gp3 40 GiB, SSH 없음·SSM만)
+AI 인스턴스 (EC2, 데모 사양 m7i-flex.large 2 vCPU / 8 GiB, root gp3 40 GiB, SSH 없음·SSM만)
 ├─ 사설 IP 10.0.1.20 (고정)   ← AI_SERVER_BASE_URL=http://10.0.1.20:8000 (BE가 호출)
 ├─ ai-sg: 8000은 be-sg에서만 허용 (AI는 인증이 없어 이 규칙이 유일한 접근 통제)
 ├─ /data  ← 별도 EBS gp3 20 GiB (암호화, prevent_destroy, DLM 일일 스냅샷), UUID로 fstab 등록
@@ -40,7 +40,7 @@ AI 인스턴스 (EC2, 초기 시험 사양 m5.xlarge, root gp3 40 GiB, SSH 없�
 | 첫 요청 / 이후 | 3.9초 / 0.65초 | |
 | CPU 학습 | 17.6분(GPU 18초), 어댑터가 바이트 단위로 동일 | **H100 서버의 CPU에서 측정**이라 2~4 vCPU 인스턴스에서는 더 걸린다. 학습 중 메모리는 측정된 적이 없다. 학습 타임아웃 기본값 5400초 |
 
-그래서 AI 인스턴스 사양은 **초기 시험 사양**이다. 추론만 보면 메모리는 작지만 CPU 학습의 속도와 메모리는 확인되지 않았다. 확정 절차는 [사양 확정 절차](OPERATIONS-SIZING.md).
+그래서 AI 인스턴스는 **데모 사양** `m7i-flex.large`(2 vCPU / 8 GiB)다. 추론만 보면 2 GiB에 가깝지만 CPU 학습의 속도와 메모리는 확인되지 않아 여유를 두었다. 확정 절차는 [사양 확정 절차](OPERATIONS-SIZING.md).
 
 ## 배포 체크리스트
 

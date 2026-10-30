@@ -1,6 +1,6 @@
 # CI/CD 흐름: 이벤트 배포, 락, 레이어별 apply
 
-2026-10-03 기준 코드와 오프라인 테스트까지 구현했다. **AWS에 적용하지 않았고 실제 이벤트로 실행해 본 적이 없다.** 결정은 [ADR 0006](adr/0006-three-instance-topology.md), 네트워크는 [네트워크·엣지 가이드](NETWORK-AND-EDGE.md).
+2026-10-03에 AWS에 적용했고 `terraform-plan`·`terraform-apply`·`ssm-deploy`는 수동으로 실행해 확인했다. **소스 레포 이벤트(`repository_dispatch`)로 실행해 본 적은 아직 없다.** 결정은 [ADR 0006](adr/0006-three-instance-topology.md), 네트워크는 [네트워크·엣지 가이드](NETWORK-AND-EDGE.md).
 
 ## 전체 흐름
 

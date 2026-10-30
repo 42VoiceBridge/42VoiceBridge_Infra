@@ -1,6 +1,6 @@
 # 배포 진행 상황
 
-최종 갱신: 2026-10-03 (Asia/Seoul)
+최종 갱신: 2026-10-30 (Asia/Seoul)
 
 이 문서는 배포 작업의 현재 상태를 추적한다. `[x]`는 사용자 확인 또는 실행 결과가 있는 항목, `[ ]`는 진행 중·미확인·미완료 항목이다. 상태를 갱신할 때는 완료 근거와 남은 작업을 함께 적고, 비밀값은 기록하지 않는다. **"코드 구현·오프라인 테스트 완료"와 "AWS에서 확인됨"을 구분한다.**
 
@@ -41,12 +41,12 @@
 
 ### 미확인·미완료
 
-- [ ] **`voicebridge/dev/ghcr` 시크릿 미생성 — 앱 배포가 AI 단계에서 막힘.** GHCR 자격 증명을 `voicebridge/dev/app`에 넣어뒀다는 보고가 있었으나 AI·FE 역할은 그 시크릿을 읽을 IAM 권한이 없다(BE만 가능, 전환기 폴백). `voicebridge/dev/app`을 가리키도록 임시로 바꿔 동작은 확인했지만 AI·FE가 BE의 DB·Redis 자격 증명까지 읽게 되는 부작용이 있어 원복했다. 운영자가 내일 `voicebridge/dev/ghcr`를 별도로 생성하기로 함.
+- [ ] **`voicebridge/dev/ghcr` 시크릿 미생성 — 앱 배포가 AI 단계에서 막힘.** GHCR 자격 증명을 `voicebridge/dev/app`에 넣어뒀다는 보고가 있었으나 AI·FE 역할은 그 시크릿을 읽을 IAM 권한이 없다(BE만 가능, 전환기 폴백). `voicebridge/dev/app`을 가리키도록 임시로 바꿔 동작은 확인했지만 AI·FE가 BE의 DB·Redis 자격 증명까지 읽게 되는 부작용이 있어 원복했다. 운영자가 `voicebridge/dev/ghcr`를 별도로 생성하기로 함. 2026-10-05 FE 배포가 HTTPS 검증 단계까지 진행됐으므로(FE 역할은 이 시크릿만 읽는다) 생성된 것으로 보이지만 운영자 확인과 AI·BE 배포 결과 기록이 필요하다.
 - [ ] GitHub Actions에서의 실제 이벤트 실행(재사용 워크플로, 아티팩트, S3 조건부 쓰기 락)은 여전히 미확인. 이벤트 워크플로는 `main`에 머지됐으니(완료) 각 레포 CI가 실제로 호출하는지만 남음.
 - [ ] 배포용 IAM 사용자에 `locks/dev/*`, SSM Parameter Store `/voicebridge/dev/deployed/*` 권한이 있는지.
-- [ ] **인스턴스 사양은 AWS 계정의 Free Tier 제한 때문에 임시로 축소된 상태**(RDS `db.t3.micro`, BE·AI `t3.small`, ElastiCache만 원래 `cache.m5.large`로 통과). 원래 설계값(BE `m5.large`, AI `m5.xlarge`, RDS `db.r5.large`)으로 되돌리려면 AWS 계정 플랜 업그레이드가 먼저 필요하다. 메모리·CPU 실측으로 정식 사양 확정 필요. 비용(약 $0.9/시간)은 추정치이며 현재 축소된 사양으로는 더 낮다.
+- [ ] **데모 사양으로 조정 — 코드 반영, apply 대기.** Redis `cache.m5.large` → `cache.t4g.micro`(`apply_immediately = true`), AI `t3.small` → `m7i-flex.large`(8 GiB). BE·FE `t3.small`, RDS `db.t3.micro`는 유지. 가동 중 시간당 $0.310 → $0.2347(서울 On-Demand 단가). apply 전에 `m7i-flex.large`가 이 계정의 Free 플랜에서 허용되는지 확인하고, apply 후 시연 시나리오로 BE·AI 메모리를 측정한다. [사양·비용](docs/OPERATIONS-SIZING.md)
 - [ ] SSH와 SSM 중 최종 접속·배포 방식 결정. [ADR 0004](docs/adr/0004-ec2-access-method.md)는 `Pending`(SSH는 BE에만 남김).
-- [ ] Let's Encrypt 발급(EIP 공개 DNS 이름), GHCR pull(PAT 권한 범위) 모두 실제 앱 배포 시점에 확인 필요 — 아직 컨테이너가 하나도 안 떠서 미확인.
+- [ ] **Let's Encrypt:** EIP 공개 DNS 이름(`*.compute.amazonaws.com`)은 정책상 거부됨(2026-10-05 FE 배포, Caddy 로그 `rejectedIdentifier`). `fe_domain`을 `3-34-9-37.sslip.io`로 전환했다(`fe_domain.auto.tfvars`). 전환 후 발급 결과는 미확인. [네트워크·엣지 가이드](docs/NETWORK-AND-EDGE.md)
 
 ## 다음 작업 순서
 
@@ -95,3 +95,5 @@
 | 2026-10-03 | AI팀 전달 반영: `deploy-ai` 이벤트 수신 워크플로 추가(이미지 경로는 payload를 신뢰하지 않고 Infra 변수와 SHA로 조립), AI 데이터 디렉터리 `enroll`·`jobs` 및 소유권(uid 10001) 보정, `ALLOW_CPU_TRAIN=1` 전달, ADR 0005에 CPU 학습 정정과 메모리 실측(517 MiB 대기, 1.67 GiB 전사 3건 후) 반영. `main` 반영 전에는 이벤트가 워크플로를 실행하지 않음 | [deploy-ai.yml](.github/workflows/deploy-ai.yml), [ADR 0005](docs/adr/0005-ai-serving-topology.md), AI 저장소 `docs/INFRA_AI_배포_정보_2026-10-03.md` |
 | 2026-10-03 | 운영자 결정으로 FE·BE·AI를 개별 인스턴스로 분리(ADR 0006, ADR 0005 대체). Terraform(보안그룹 5개, 인스턴스 3대, 고정 사설 IP, FE EIP, 역할별 IAM, AI 데이터 볼륨 + DLM), 배포 스크립트·`run.sh`, 이벤트 워크플로 3종, 락, 레이어별 plan/apply, 문서와 오프라인 테스트를 구현. 리뷰 지적 반영: 세 역할의 `deploy/scripts/*` 읽기 누락, 초기 레이어별 순서, BE 포트 8080 통일, FE→BE 주소 고정, GHCR 시크릿 분리의 동시 전환, apply·배포 충돌, `-lock=false` 철회(잠금은 S3 네이티브이며 DynamoDB 아님). AWS 적용·plan·실측은 전 | [ADR 0006](docs/adr/0006-three-instance-topology.md), [검증 가이드](docs/INFRA-VERIFICATION.md), [후속 작업](docs/FOLLOW-UPS.md) |
 | 2026-10-03 | PR #10 머지 후 1_base → 2_storage → 3_application을 실제 AWS에 plan·apply. 과정에서 Free Tier 제한(RDS·BE·AI 인스턴스 사이즈 임시 축소), AMI 필터가 ECS 변종을 잘못 선택, `dnf install docker`가 `curl-minimal`과 충돌, `user_data` 변경이 재부팅으로 반영되지 않음, XFS 레이블 12자 초과로 AI `/data` 마운트 실패 — 4개 문제를 발견해 전부 수정. `check` 모드로 세 인스턴스 SSM·Docker·AI 마운트 정상 확인. 실제 앱 배포(`deploy` 모드)는 `voicebridge/dev/ghcr` 시크릿 미생성으로 AI 단계에서 보류(`voicebridge/dev/app`으로의 임시 전환은 보안 경계상 원복) | 워크플로 실행 기록(`terraform-plan`/`terraform-apply`/`ssm-deploy` 다수), 커밋 `2889467`→`f9eba55` |
+| 2026-10-05 | FE 배포 후 HTTPS 확인 경고. Caddy 로그로 Let's Encrypt가 EIP 공개 DNS 이름을 정책상 거부하는 것을 확인하고 `fe_domain`을 `3-34-9-37.sslip.io`로 전환. 테스트 단언을 실제 사양(`t3.small`)과 `dnf --allowerasing`에 맞춤 | 커밋 `c89892b`→`437dc75` |
+| 2026-10-30 | 데모 용도에 맞춰 사양 조정: Redis `cache.t4g.micro`(+`apply_immediately`), AI `m7i-flex.large`, 나머지 유지. AWS Pricing API 단가로 비용을 다시 계산해 문서 갱신(가동 중 $0.2347/시간, 평일 10시간 운영 시 월 약 $95). apply는 대기 | [사양·비용](docs/OPERATIONS-SIZING.md) |

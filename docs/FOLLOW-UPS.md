@@ -134,8 +134,9 @@
 
 ## 5. 도메인
 
+- [x] 도메인 없이 HTTPS: Let's Encrypt가 EIP 공개 DNS 이름을 거부해서 `fe_domain`을 `3-34-9-37.sslip.io`로 설정(2026-10-05, `fe_domain.auto.tfvars`). 발급 성공 여부는 아직 기록 없음
 - [ ] 도메인을 확보하면 DNS A 레코드를 `terraform output fe_public_ip`로 연결하고 `fe_domain`을 설정한 뒤 plan → apply → FE 재배포
-- [ ] 카카오 개발자 콘솔에 FE의 정확한 https 출처를 등록(도메인이 없으면 EIP 공개 DNS 이름이 바뀔 때마다 재등록)
+- [ ] 카카오 개발자 콘솔에 FE의 정확한 https 출처를 등록(도메인이 없으면 sslip.io 이름이 EIP와 함께 바뀔 때마다 재등록)
 - [ ] 도메인 구입비는 AWS 크레딧 대상이 아닐 수 있다(미확인)
 
 ## 6. 이미지 다이제스트 고정

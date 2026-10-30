@@ -1,6 +1,6 @@
 # SSM 배포 경로
 
-2026-10-03 기준으로 코드 경로를 구현했다. **Terraform `apply`, 인스턴스의 SSM 등록, 앱 배포 성공은 아직 확인되지 않았다.** 구조의 결정은 [ADR 0006](adr/0006-three-instance-topology.md), 이벤트·락·레이어별 apply는 [CI/CD 흐름](CICD-FLOW.md)을 본다. 현재 SSH 키 페어와 22번 포트는 **BE 인스턴스에만** 유지하고 AI·FE는 SSM으로만 접근한다. [ADR 0004](adr/0004-ec2-access-method.md)의 상태는 실제 검증 전까지 `Pending`이다.
+2026-10-03에 Terraform `apply`와 세 인스턴스의 SSM 등록(`check` 모드)을 확인했다. 앱 배포는 FE에서 실행됐고(2026-10-05, HTTPS 경고로 sslip.io 전환), 전체 앱 배포 결과는 [`deploy-step.md`](../deploy-step.md)에 기록한다. 구조의 결정은 [ADR 0006](adr/0006-three-instance-topology.md), 이벤트·락·레이어별 apply는 [CI/CD 흐름](CICD-FLOW.md)을 본다. 현재 SSH 키 페어와 22번 포트는 **BE 인스턴스에만** 유지하고 AI·FE는 SSM으로만 접근한다. [ADR 0004](adr/0004-ec2-access-method.md)의 상태는 실제 검증 전까지 `Pending`이다.
 
 ## 실행 구조
 

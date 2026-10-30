@@ -35,11 +35,11 @@ IAM 사용자에 직접 연결된 정책:
 
 - [ADR 0001](adr/0001-terraform-state-s3.md): 앱 리소스와 분리한 S3 버킷에 Terraform state를 보관한다.
 - [ADR 0002](adr/0002-main-branch-cd.md): BE·AI·FE `main` 푸시와 이미 검증된 GHCR 이미지를 배포 흐름에 사용한다.
-- [ADR 0006](adr/0006-three-instance-topology.md): FE·BE·AI를 개별 인스턴스로 분리한다(ADR 0005 대체). 코드 구현·오프라인 검증 완료, AWS 적용 전.
+- [ADR 0006](adr/0006-three-instance-topology.md): FE·BE·AI를 개별 인스턴스로 분리한다(ADR 0005 대체). 2026-10-03 AWS 적용 완료, 2026-10-30 데모 사양으로 조정([사양·비용](OPERATIONS-SIZING.md)).
 - [ADR 0003](adr/0003-github-deploy-identity.md): 전용 IAM 사용자의 AWS 키를 CD에 사용하되, 현재의 전체 접근 정책을 배포용 권한으로 축소한다.
 - [ADR 0004](adr/0004-ec2-access-method.md): SSH와 SSM 중 최종 접속·배포 방식은 보류한다(SSH는 BE에만 남김). SSM 구현·검증 후 확정한다.
 
-Terraform S3 backend는 코드에 반영됐고 [GitHub Actions 준비 점검](https://github.com/42VoiceBridge/42VoiceBridge_Infra/actions/runs/36981904406)에서 AWS 인증, 버킷 리전, 세 레이어 초기화·검증이 성공했다. SSM 수동 배포 경로는 코드로 구현했지만 아직 `apply`·실제 배포 검증 전이다. IAM 권한 축소와 BE 자동 연동도 남았다. [SSM 배포 절차](SSM-DEPLOYMENT.md)를 참고한다.
+Terraform S3 backend는 코드에 반영됐고 [GitHub Actions 준비 점검](https://github.com/42VoiceBridge/42VoiceBridge_Infra/actions/runs/36981904406)에서 AWS 인증, 버킷 리전, 세 레이어 초기화·검증이 성공했다. 세 레이어는 2026-10-03에 apply했고 SSM `check`로 세 인스턴스 연결을 확인했다. IAM 권한 축소와 BE 자동 연동도 남았다. [SSM 배포 절차](SSM-DEPLOYMENT.md)를 참고한다.
 
 첫 준비 점검에서 발생한 provider 체크섬 오류와 수정 과정은 [트러블슈팅 0001](troubleshooting/0001-terraform-provider-checksum.md)에 정리했다.
 

@@ -1,6 +1,6 @@
 # 네트워크·주소·HTTPS(엣지) 가이드
 
-[ADR 0006](adr/0006-three-instance-topology.md)의 네트워크 계약을 한 곳에 모았다. 2026-10-03 기준으로 코드와 오프라인 테스트까지 구현했고 **AWS에는 적용하지 않았다.** "첫 배포에서 확인"이라고 적은 항목은 이 세션에서 직접 검증하지 못한 것이다.
+[ADR 0006](adr/0006-three-instance-topology.md)의 네트워크 계약을 한 곳에 모았다. 2026-10-03에 AWS에 적용했다. 2026-10-05 FE 배포에서 Let's Encrypt가 EIP 공개 DNS 이름을 거부하는 것을 확인해 FE 주소를 sslip.io 이름으로 바꿨다. "첫 배포에서 확인"이라고 적은 항목은 아직 직접 검증하지 못한 것이다.
 
 ## 주소와 포트 계약
 
@@ -56,19 +56,22 @@ BE에 직접 접속해 보고 싶다면 인터넷에서는 불가능하다. SSM 
 
 ### 도메인이 없을 때 (현재 상태)
 
-AWS가 도메인을 주지는 않는다. 대신 Elastic IP에는 **공개 DNS 이름**이 자동으로 붙는다.
+AWS가 도메인을 주지는 않는다. Elastic IP에는 **공개 DNS 이름**(`ec2-3-34-9-37.ap-northeast-2.compute.amazonaws.com`)이 자동으로 붙지만, **Let's Encrypt는 `*.compute.amazonaws.com`에 인증서를 발급하지 않는다.** 2026-10-05 FE 배포에서 Caddy 로그로 확인했다(`rejectedIdentifier`, "forbidden by policy").
+
+그래서 지금은 **[sslip.io](https://sslip.io)** 이름을 쓴다. sslip.io는 이름 안의 IP로 바로 resolve해 주는 무료 DNS라 가입이나 DNS 설정이 필요 없다.
 
 ```
-ec2-203-0-113-10.ap-northeast-2.compute.amazonaws.com    ← EIP 203.0.113.10의 예
+3-34-9-37.sslip.io    → 3.34.9.37 (FE Elastic IP)
 ```
 
-- `fe_domain`이 비어 있으면 Terraform이 `fe_public_host`를 이 이름으로 내보내고(`terraform output fe_public_host`) 배포 스크립트가 이 이름으로 인증서를 발급받는다. 구입한 도메인 없이 HTTPS를 쓸 수 있다.
-- **확인 필요(첫 배포):** Let's Encrypt가 이 이름으로 인증서를 발급해 주는지는 이 세션에서 직접 검증하지 못했다. 일반적으로 사용되는 방식이지만 실패하면 `docker logs voicebridge-edge`에 사유가 남고 배포 로그에 "HTTPS ... was not verified" 경고가 나온다.
+- 값은 `3_application/fe_domain.auto.tfvars`의 `fe_domain = "3-34-9-37.sslip.io"`이고, Terraform이 이를 `fe_public_host`로 내보낸다(`terraform output fe_public_host`). 배포 스크립트가 이 이름으로 인증서를 발급받는다.
+- `fe_domain`이 비어 있으면 코드는 여전히 EIP 공개 DNS 이름을 쓰지만, 위 이유로 HTTPS는 발급되지 않는다.
+- **확인 필요:** sslip.io 이름으로 전환한 뒤 인증서가 실제로 발급됐는지는 아직 기록이 없다. 실패하면 `docker logs voicebridge-edge`에 사유가 남고 배포 로그에 "HTTPS ... was not verified" 경고가 나온다.
 - **한계:**
-  - EIP를 새로 만들면(예: FE 인스턴스 또는 EIP 리소스를 destroy 후 재생성) **주소가 바뀐다.** 새 이름으로 인증서를 다시 발급받고 FE 이미지의 API 주소와 카카오 설정도 맞춰야 한다. Terraform에서 EIP를 지우지 않는 한 유지된다.
-  - Let's Encrypt는 같은 이름의 중복 발급 횟수에 한도가 있다. 반복해서 destroy/apply하며 시험하면 한도에 걸릴 수 있다.
-  - 이 주소는 사람이 외우기 어렵다.
-- **도메인이 생기면:** ① DNS의 A 레코드를 `terraform output fe_public_ip` 값으로 연결 ② `3_application`의 변수 `fe_domain`을 설정(예: `app.example.com`) ③ plan 검토 후 apply ④ FE 재배포(엣지가 새 호스트로 다시 발급). 코드 변경은 필요 없다.
+  - EIP를 새로 만들면(예: EIP 리소스를 destroy 후 재생성) **IP가 바뀌므로 `fe_domain.auto.tfvars`도 새 IP로 고쳐야 한다.** FE 이미지의 API 주소와 카카오 설정도 맞춰야 한다. Terraform에서 EIP를 지우지 않는 한 유지된다.
+  - Let's Encrypt는 같은 이름의 중복 발급 횟수에 한도가 있다. sslip.io는 많은 사람이 쓰는 공용 도메인이라 등록 도메인 단위 한도에도 걸릴 수 있다. 반복해서 destroy/apply하며 시험하면 한도에 걸릴 수 있다.
+  - 외부 무료 서비스에 의존한다. sslip.io가 응답하지 않으면 접속할 수 없다.
+- **도메인이 생기면:** ① DNS의 A 레코드를 `terraform output fe_public_ip` 값으로 연결 ② `fe_domain.auto.tfvars`를 지우고 `terraform.tfvars`(또는 그 파일)에 `fe_domain`을 설정(예: `app.example.com`) ③ plan 검토 후 apply ④ FE 재배포(엣지가 새 호스트로 다시 발급). 코드 변경은 필요 없다.
 
 ## FE 레포에 요청할 변경 (같은 출처 API)
 
@@ -79,13 +82,13 @@ FE 레포(`src/api/*.ts`)는 `API_BASE_URL = import.meta.env.VITE_API_URL || 'ht
 | 방식 | FE 쪽 변경 | 장단점 |
 |---|---|---|
 | **A. 같은 출처(추천)** | `||`를 `??`로 바꿔 `VITE_API_URL`이 빈 문자열이면 그대로 쓰고, FE 레포 Variables `VITE_API_URL`을 빈 값으로 둔다(요청 경로는 `/api/v1/...`). | 호스트가 바뀌어도 이미지를 다시 빌드하지 않는다. Infra의 프록시 구조와 맞는다. |
-| B. 절대 주소 | `VITE_API_URL`을 최종 https 주소(예: `https://ec2-....compute.amazonaws.com`)로 두고 빌드. | 코드 변경은 없지만 **호스트(EIP)가 바뀔 때마다 FE 이미지를 다시 빌드·배포**해야 한다. |
+| B. 절대 주소 | `VITE_API_URL`을 최종 https 주소(예: `https://3-34-9-37.sslip.io`)로 두고 빌드. | 코드 변경은 없지만 **호스트(EIP)가 바뀔 때마다 FE 이미지를 다시 빌드·배포**해야 한다. |
 
 둘 다 FE 레포에서 하는 일이며 Infra 코드는 어느 쪽이든 동작한다(방식 B에서는 프록시가 `/api/*`를 받아 BE로 넘기는 기능을 쓰지 않을 뿐이다).
 
 ## 카카오 로그인
 
-FE는 카카오 JavaScript 키(`VITE_KAKAO_JAVASCRIPT_KEY`)로 로그인한다. 카카오 개발자 콘솔은 **허용된 웹 도메인/리다이렉트 URI**만 받으므로 FE가 서비스되는 정확한 https 출처를 등록해야 한다. 도메인 없는 EIP 공개 DNS 이름을 쓰면 EIP가 바뀔 때마다 재등록이 필요하다. 이 설정은 카카오 콘솔에서 하는 일이라 이 레포의 코드나 문서로는 대신할 수 없다. 안정적인 로그인에는 도메인이 필요하다.
+FE는 카카오 JavaScript 키(`VITE_KAKAO_JAVASCRIPT_KEY`)로 로그인한다. 카카오 개발자 콘솔은 **허용된 웹 도메인/리다이렉트 URI**만 받으므로 FE가 서비스되는 정확한 https 출처를 등록해야 한다. 도메인 없이 sslip.io 이름을 쓰면 EIP가 바뀔 때마다 재등록이 필요하다. 이 설정은 카카오 콘솔에서 하는 일이라 이 레포의 코드나 문서로는 대신할 수 없다. 안정적인 로그인에는 도메인이 필요하다.
 
 ## 이 구조에서 확인하는 방법
 
