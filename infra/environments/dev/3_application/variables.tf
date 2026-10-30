@@ -7,7 +7,7 @@ variable "project_name" {
 variable "aws_region" {
   description = "AWS region to deploy into"
   type        = string
-  default     = "ap-northeast-2"
+  default     = "ap-southeast-2"
 }
 
 # 인스턴스 사양은 모두 "초기 시험 사양"이다. 배포 후 CloudWatch/SSM 실측으로 확정한다

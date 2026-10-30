@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      AWS_REGION: ap-northeast-2
+      AWS_REGION: ap-southeast-2
       TF_IN_AUTOMATION: 'true'
       DEPLOY_MODE: ${{ inputs.mode }}
       BE_SHA: ${{ inputs.be_sha }}

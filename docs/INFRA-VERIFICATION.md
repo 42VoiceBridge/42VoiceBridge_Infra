@@ -165,7 +165,7 @@ echo | openssl s_client -connect "$HOST:443" -servername "$HOST" 2>/dev/null | o
 - [ ] 실제 `deploy-ai`/`deploy-frontend` 이벤트로 워크플로가 실행되고(`main`에 머지된 뒤), 형식·출처 검증과 락 획득·해제 로그가 나온다
 - [ ] `3_application`을 교체가 포함되도록 apply한 뒤 새 인스턴스가 마지막 성공 배포로 복원된다(`post-apply`)
 - [ ] 같은 시각에 apply와 배포를 시작하면 배포가 대기하는지(락 로그) 확인한다
-- [ ] 락이 남지 않았는지: `aws s3 ls s3://42voicebridge-tfstate/locks/dev/` 가 비어 있어야 한다
+- [ ] 락이 남지 않았는지: `aws s3 ls s3://voicebridge-tfstate42/locks/dev/` 가 비어 있어야 한다
 
 ### 5-7. 사양 측정
 

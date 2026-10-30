@@ -8,7 +8,7 @@
 
 ### 확인된 것
 
-- [x] Terraform state용 S3 버킷 `42voicebridge-tfstate` 생성. 사용자 확인: 서울 리전 `ap-northeast-2`, 버전 관리 활성화, 퍼블릭 액세스 차단.
+- [x] 새 계정에 Terraform state용 S3 버킷 `voicebridge-tfstate42` 생성(시드니 리전 `ap-southeast-2`, 버전 관리 활성화, 퍼블릭 액세스 차단). 기존 계정의 `42voicebridge-tfstate`는 쓰지 않는다.
 - [x] 세 Terraform 레이어를 서로 다른 S3 state 경로에 연결하고 S3 네이티브 잠금(`use_lockfile`) 설정. DynamoDB는 쓰지 않는다. [ADR 0001](docs/adr/0001-terraform-state-s3.md)
 - [x] `github-deploy-user`의 AWS 액세스 키를 Infra 저장소 Actions Secrets에 등록(사용자 확인, 값은 확인하지 않음).
 - [x] [CD 준비 점검](.github/workflows/cd-preflight.yml)에서 AWS 인증, S3 버킷 리전, 세 레이어 `terraform init`·`validate` 성공. [성공한 실행](https://github.com/42VoiceBridge/42VoiceBridge_Infra/actions/runs/36981904406). `apply`는 하지 않았다.
@@ -97,3 +97,4 @@
 | 2026-10-03 | PR #10 머지 후 1_base → 2_storage → 3_application을 실제 AWS에 plan·apply. 과정에서 Free Tier 제한(RDS·BE·AI 인스턴스 사이즈 임시 축소), AMI 필터가 ECS 변종을 잘못 선택, `dnf install docker`가 `curl-minimal`과 충돌, `user_data` 변경이 재부팅으로 반영되지 않음, XFS 레이블 12자 초과로 AI `/data` 마운트 실패 — 4개 문제를 발견해 전부 수정. `check` 모드로 세 인스턴스 SSM·Docker·AI 마운트 정상 확인. 실제 앱 배포(`deploy` 모드)는 `voicebridge/dev/ghcr` 시크릿 미생성으로 AI 단계에서 보류(`voicebridge/dev/app`으로의 임시 전환은 보안 경계상 원복) | 워크플로 실행 기록(`terraform-plan`/`terraform-apply`/`ssm-deploy` 다수), 커밋 `2889467`→`f9eba55` |
 | 2026-10-05 | FE 배포 후 HTTPS 확인 경고. Caddy 로그로 Let's Encrypt가 EIP 공개 DNS 이름을 정책상 거부하는 것을 확인하고 `fe_domain`을 `3-34-9-37.sslip.io`로 전환. 테스트 단언을 실제 사양(`t3.small`)과 `dnf --allowerasing`에 맞춤 | 커밋 `c89892b`→`437dc75` |
 | 2026-10-30 | 데모 용도에 맞춰 사양 조정: Redis `cache.t4g.micro`(+`apply_immediately`), AI `m7i-flex.large`, 나머지 유지. AWS Pricing API 단가로 비용을 다시 계산해 문서 갱신(가동 중 $0.2347/시간, 평일 10시간 운영 시 월 약 $95). apply는 대기 | [사양·비용](docs/OPERATIONS-SIZING.md) |
+| 2026-10-30 | 새 AWS 계정으로 이전. 기존 계정 CI 키가 무효가 되어 계정에 묶인 자원을 새로 만든다. state 버킷 이름을 `42voicebridge-tfstate`에서 `voicebridge-tfstate42`로 변경(코드 9곳, 문서). 새 계정은 프로젝트 리전이 시드니로 고정돼 있어 리전을 `ap-northeast-2`에서 `ap-southeast-2`로 변경(backend, 변수 기본값, 워크플로, `run.sh`). 다른 문서의 서울 리전 표기는 기존 계정 기준이다. 위 기록 중 2026-10-03~10-05의 apply·배포 이력은 기존 계정의 것이다. FE 주소(`fe_domain`)는 새 Elastic IP가 나온 뒤 별도 PR로 바꾼다 | 이 PR |
