@@ -26,6 +26,8 @@
 | `JWT_SECRET` | 배포 관리자가 생성·교체 | AWS Secrets Manager `voicebridge/dev/app` → EC2에서 조회 후 환경변수 | 운영자 확인: 값 등록 완료. **시크릿 이름·필드명 및 역할 적용 미확인** |
 | `AI_SERVER_BASE_URL` | AI 인스턴스의 고정 사설 IP 주소 `http://10.0.1.20:8000`(ADR 0006, `terraform output ai_base_url`). 배포 관리자가 등록 | AWS Secrets Manager `voicebridge/dev/app` → EC2 환경변수. **AI 제외 초기 BE 배포에서는 생략 가능** | 실제 AI 주소가 없으면 AI 의존 기능은 작동하지 않음. BE의 `127.0.0.1:8000` 기본값은 컨테이너 안에서 AI 서버를 찾지 못함. BE는 시작 시점에만 값을 읽으므로 변경 후 BE를 다시 배포해야 함 |
 | `NCP_TTS_API_KEY_ID`, `NCP_TTS_API_KEY` | NCP **AI·NAVER API → Application**의 CLOVA Voice Client ID / Client Secret을 발급·교체, AWS 관리자가 앱용 시크릿에 등록 | AWS Secrets Manager `voicebridge/dev/app` → EC2 환경변수. NCP 계정의 API Authentication Key(Access Key ID / Secret Key)와 구별 | 운영자 확인: 값 두 개 등록 완료. **시크릿 이름·필드명 및 역할 적용 미확인**. GitHub Secrets에 둘 값이 아님 |
+| `KAKAO_CLIENT_ID`, `KAKAO_REDIRECT_URI`, `KAKAO_CLIENT_SECRET` | 카카오 개발자 콘솔의 REST API 키, FE가 `Kakao.Auth.authorize()`에 넘기는 Redirect URI와 정확히 같은 값, (Client Secret을 켠 경우) Client Secret | AWS Secrets Manager `voicebridge/dev/app`의 **선택 필드** → 있을 때만 BE 환경변수 | 없으면 BE 카카오 로그인이 항상 401(`KAKAO_AUTH_FAILED`). 2026-10-30 운영 BE 컨테이너에서 두 값이 비어 있음을 확인 |
+| `ANTHROPIC_API_KEY` | Claude Console에서 발급한 API 키 | AWS Secrets Manager `voicebridge/dev/app`의 **선택 필드** → 있을 때만 BE 환경변수 | BE 문구 추천(LLM) 기능용. 없으면 그 기능만 503이고 나머지는 동작 |
 | `FFMPEG_PATH`, `FFPROBE_PATH` | 이미지·런타임 설정 담당자 | 현재 BE 설정 기본값은 각각 `ffmpeg`, `ffprobe`. 기본 경로가 유효하면 별도 환경변수 불필요 | EC2 컨테이너 내부 프로그램 경로. 비밀값 아님 |
 
 `application-prod.yml`은 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`에 기본값을 주지 않는다. `SPRING_PROFILES_ACTIVE=prod`를 설정해야 이 구성이 적용된다. 앱의 `DB_PASSWORD`를 시작 시 환경변수로 전달하는 방식이라면 RDS 비밀번호 회전 후 새 값을 반영하려면 재시작 또는 재배포가 필요하다.
@@ -53,14 +55,14 @@ AWS 키 생성 화면의 **Access key ID**는 `AWS_ACCESS_KEY_ID`, **Secret acce
 
 | 컴포넌트 | 값 | 출처 |
 |---|---|---|
-| BE | `SPRING_PROFILES_ACTIVE`, `DB_*`, `REDIS_*`, `S3_BUCKET`, `AWS_REGION`, `JWT_SECRET`, `NCP_TTS_*`, `AI_SERVER_BASE_URL` | 위 표. 시크릿에서 읽어 env-file로 전달(명령줄에 노출하지 않음) |
+| BE | `SPRING_PROFILES_ACTIVE`, `DB_*`, `REDIS_*`, `S3_BUCKET`, `AWS_REGION`, `JWT_SECRET`, `NCP_TTS_*`, `AI_SERVER_BASE_URL`, (선택) `KAKAO_*`, `ANTHROPIC_API_KEY` | 위 표. 시크릿에서 읽어 env-file로 전달(명령줄에 노출하지 않음) |
 | AI | `HF_HOME=/data/hf`, `ALLOW_CPU_TRAIN=1` (나머지는 AI 이미지의 Dockerfile) | [AI 배포 가이드](AI-DEPLOYMENT.md) |
 | FE | (없음) `VITE_API_URL` 등은 **이미지 빌드 시점**에 FE CI가 번들에 넣는다 | [네트워크·엣지 가이드](NETWORK-AND-EDGE.md#fe-레포에-요청할-변경-같은-출처-api) |
 | FE 엣지(Caddy) | 공개 호스트(`fe_public_host`)와 BE 업스트림(`be_upstream`)을 Caddyfile로 생성 | Terraform 출력 |
 
 ## 카카오 로그인과 AWS 키
 
-현재 BE는 클라이언트가 `/api/v1/auth/kakao`에 보낸 `kakaoAccessToken`을 카카오 사용자 정보 API에 전달한다. **BE 서버용 카카오 API 키 환경변수는 현재 없다.** 클라이언트의 카카오 앱 설정과 이 표의 서버·CD 비밀값을 혼동하지 않는다.
+BE는 BE #41부터 FE가 보낸 **카카오 인가 코드**(`authorizationCode`)를 받아 BE가 직접 카카오 토큰을 발급받는다. 그래서 BE에 `KAKAO_CLIENT_ID`, `KAKAO_REDIRECT_URI`(필요하면 `KAKAO_CLIENT_SECRET`)가 있어야 한다(위 표). FE의 JavaScript 키(`VITE_KAKAO_JAVASCRIPT_KEY`)는 FE 빌드 설정이며 BE 시크릿과 다르다.
 
 앱 S3 접근에는 EC2 Instance Profile을 사용한다. 따라서 **백엔드 컨테이너에 AWS 액세스 키를 주입하지 않는다.** Terraform state 버킷 `voicebridge-tfstate42` 역시 앱의 `S3_BUCKET`과 별개다.
 
