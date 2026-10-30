@@ -430,8 +430,11 @@ case "$component" in
     fi
 
     # 선택 필드: 시크릿에 있을 때만 전달한다(없으면 BE가 해당 기능만 끈 채로 뜬다).
-    # 카카오 인가 코드 로그인(BE #41)과 Claude API(문구 추천)용. 값은 env-file로만 넘기고 출력하지 않는다.
-    for key in ANTHROPIC_API_KEY KAKAO_CLIENT_ID KAKAO_REDIRECT_URI KAKAO_CLIENT_SECRET; do
+    # 카카오 인가 코드 로그인(BE #41), Claude API(문구 추천·대화 답변), CLOVA Speech Recognition(대화 모드 받아쓰기)용.
+    # FEATURE_*는 BE 기능 플래그다. 문자열 "true"일 때만 켜진다(JSON boolean은 거절). 값은 env-file로만 넘기고 출력하지 않는다.
+    for key in ANTHROPIC_API_KEY KAKAO_CLIENT_ID KAKAO_REDIRECT_URI KAKAO_CLIENT_SECRET \
+      CLOVA_STT_API_KEY_ID CLOVA_STT_API_KEY \
+      FEATURE_PERSONALIZATION_ENABLED FEATURE_DIAGNOSIS_ENABLED FEATURE_SUGGESTION_ENABLED FEATURE_CONVERSATION_ENABLED; do
       value=$(jq -er --arg k "$key" '.[$k] // "" | if type == "string" then . else error("\($k) must be a string") end' <<<"$app_json")
       if [[ -n "$value" ]]; then
         append_env "$key" "$value"

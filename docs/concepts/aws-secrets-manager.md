@@ -45,7 +45,9 @@ AWS는 루트를 일상 작업에 사용하지 않도록 권장한다. 지금은
    | `KAKAO_CLIENT_ID` | (선택) 카카오 개발자 콘솔 앱의 **REST API 키**. 없으면 BE의 카카오 로그인이 항상 실패한다 |
    | `KAKAO_REDIRECT_URI` | (선택) FE가 `Kakao.Auth.authorize({ redirectUri })`에 넘기는 주소와 **정확히 같은 값**. 카카오 콘솔에도 등록 |
    | `KAKAO_CLIENT_SECRET` | (선택) 카카오 콘솔에서 Client Secret을 켠 경우에만 |
-   | `ANTHROPIC_API_KEY` | (선택) Claude API 키(Claude Console에서 발급). BE의 문구 추천 기능이 쓴다. 없으면 그 기능만 503 |
+   | `ANTHROPIC_API_KEY` | (선택) Claude API 키(Claude Console에서 발급). BE의 문구 추천·대화 답변 기능이 쓴다. 없으면 그 기능만 503 |
+   | `CLOVA_STT_API_KEY_ID`, `CLOVA_STT_API_KEY` | (선택) 네이버 클라우드 CLOVA Speech Recognition 키. BE 대화 모드의 받아쓰기가 쓴다. 없으면 그 기능만 503 |
+   | `FEATURE_*_ENABLED` | (선택) BE 기능 플래그. 문자열 `"true"`/`"false"`로 넣는다(JSON boolean이면 배포 실패). 없으면 BE 기본값 |
 
    선택 필드는 값이 있을 때만 배포 스크립트가 컨테이너에 전달한다. 값을 바꾼 뒤에는 BE를 다시 배포해야 반영된다.
 
