@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      AWS_REGION: ap-northeast-2
+      AWS_REGION: ap-southeast-2
       TF_IN_AUTOMATION: 'true'
       LAYER: ${{ inputs.layer }}
       PLAN_RUN_ID: ${{ inputs.plan_run_id }}

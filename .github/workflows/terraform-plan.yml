@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      AWS_REGION: ap-northeast-2
+      AWS_REGION: ap-southeast-2
       TF_IN_AUTOMATION: 'true'
       LAYER: ${{ inputs.layer }}
       # 기본값이 없는 입력 변수. Infra 저장소 Variables(비밀 아님)에서 받는다.

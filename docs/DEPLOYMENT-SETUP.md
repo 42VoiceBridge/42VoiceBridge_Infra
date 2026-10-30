@@ -6,9 +6,9 @@
 
 | 항목 | 현재 상태 |
 |---|---|
-| Terraform state용 S3 버킷 | `voicebridge`를 새 계정 콘솔에서 생성(2026-10-30 계정 이전, 기존 계정은 `42voicebridge-tfstate`) |
+| Terraform state용 S3 버킷 | `voicebridge-tfstate42`를 새 계정 콘솔에서 생성(2026-10-30 계정 이전, 기존 계정은 `42voicebridge-tfstate`) |
 | 버킷 설정 | 버전 관리 활성화, 퍼블릭 액세스 차단, 그 외 생성 옵션은 기본값으로 설정했다고 전달받음 |
-| 버킷 리전 | 운영자 콘솔 확인: Asia Pacific (Seoul), `ap-northeast-2` |
+| 버킷 리전 | Asia Pacific (Sydney), `ap-southeast-2`(새 계정 프로젝트 리전) |
 | IAM 사용자 | `github-deploy-user`에 아래 정책 7개가 직접 연결된 화면 확인 |
 | AWS 배포 액세스 키 | 운영자 확인: `github-deploy-user`에서 발급해 Infra 저장소 Actions Secrets에 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`로 등록 완료. 값 자체는 이 저장소에서 확인하지 않음 |
 | Terraform 코드 | 세 레이어의 S3 backend, 서로 다른 state key, S3 잠금 파일 및 상위 레이어의 S3 `terraform_remote_state` 설정 완료. 운영자 확인: 기존 로컬 state 없음. GitHub Actions에서 세 레이어의 `terraform init`·`validate` 성공 |
@@ -45,7 +45,7 @@ Terraform S3 backend는 코드에 반영됐고 [GitHub Actions 준비 점검](ht
 
 ## 다음 작업 순서
 
-1. 콘솔에서 `voicebridge`의 버전 관리와 퍼블릭 액세스 차단을 다시 확인한다. 리전은 운영자 확인에 따라 `ap-northeast-2`로 설정했다. state 버킷은 `2_storage`의 녹음/TTS 버킷과 별개이며 앱 자원보다 오래 유지한다.
+1. 콘솔에서 `voicebridge-tfstate42`의 버전 관리와 퍼블릭 액세스 차단을 다시 확인한다. 리전은 새 계정의 프로젝트 리전인 `ap-southeast-2`다. state 버킷은 `2_storage`의 녹음/TTS 버킷과 별개이며 앱 자원보다 오래 유지한다.
 2. 필요할 때 Infra 저장소의 Actions에서 `CD preflight (no deployment)`를 재실행한다. state key 경로는 `dev/1_base/terraform.tfstate`, `dev/2_storage/terraform.tfstate`, `dev/3_application/terraform.tfstate`다. 기존 로컬 state가 없다고 확인됐으므로 migration은 하지 않는다. 첫 `apply` 전에는 S3에 state 객체가 없어도 정상이다.
 3. 앱 시크릿 이름·필드명, GHCR 공개 여부, RDS 초기 스키마를 확인한다. EC2 역할의 SSM 관리 권한은 Terraform 코드에 추가됐지만 실제 적용과 연결 검증은 남았다. 현재 SSH 키 페어·22번 포트 요구사항은 유지한다.
 4. 비용(추정치)과 입력값 확인 후 **레이어별로** `Terraform plan (one layer)` → 검토 → `Terraform apply (one layer, saved plan)`을 `1_base → 2_storage → 3_application` 순서로 실행하고(첫 배포는 한 번에 전체 plan 불가) SSM `check`와 컴포넌트별 수동 배포를 검증한다. 그다음 Terraform 적용 자동화와 BE `main`의 `repository_dispatch` 호출을 구현한다. BE에는 Infra 저장소 호출용 GitHub 토큰이 필요하다.

@@ -48,7 +48,7 @@ jobs:
     # 락 대기(최대 40분) + AI 배포(최대 30분)를 감안한 상한.
     timeout-minutes: 90
     env:
-      AWS_REGION: ap-northeast-2
+      AWS_REGION: ap-southeast-2
       TF_IN_AUTOMATION: 'true'
       # 이벤트 값은 env로만 전달한다(스크립트에 ${{ }}를 직접 넣지 않는다).
       COMPONENT: ${{ inputs.component }}

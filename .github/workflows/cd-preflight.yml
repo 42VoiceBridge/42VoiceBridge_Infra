@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      AWS_REGION: ap-northeast-2
+      AWS_REGION: ap-southeast-2
       TF_IN_AUTOMATION: "true"
 
     steps:
@@ -39,7 +39,7 @@ jobs:
         run: |
           aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output json
           bucket_region=$(aws s3api get-bucket-location \
-            --bucket voicebridge \
+            --bucket voicebridge-tfstate42 \
             --query LocationConstraint \
             --output text)
           if [[ "$bucket_region" != "$AWS_REGION" ]]; then

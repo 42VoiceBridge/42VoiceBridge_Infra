@@ -6,7 +6,7 @@
 
 | 항목 | 확인된 상태 |
 |---|---|
-| Terraform state | 서울 리전의 별도 버킷 `voicebridge` 생성(2026-10-30 새 계정, 기존 계정은 `42voicebridge-tfstate`), 세 레이어 backend 준비 점검 성공. 첫 `apply` 전에는 state 객체가 없을 수 있음 |
+| Terraform state | 시드니 리전의 별도 버킷 `voicebridge-tfstate42` 생성(2026-10-30 새 계정, 기존 계정은 `42voicebridge-tfstate`), 세 레이어 backend 준비 점검 성공. 첫 `apply` 전에는 state 객체가 없을 수 있음 |
 | 배포용 AWS 인증 | `github-deploy-user`의 키를 Infra 저장소 Actions Secrets에 등록했다고 운영자가 확인. 실제 값은 저장소에 보관하지 않음 |
 | BE 이미지 | BE CI가 GHCR에 게시 중이라고 운영자가 확인. 대상 이미지의 공개 여부와 배포할 `main` SHA는 별도 확인 필요 |
 | 앱 비밀값 | 운영자가 서울 리전 Secrets Manager에 NCP 인증 정보 두 개와 JWT 서명 값을 등록했다고 확인. **시크릿 이름과 JSON 필드명이 배포 코드와 일치하는지는 미확인** |
