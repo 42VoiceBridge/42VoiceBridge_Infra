@@ -19,7 +19,7 @@ set -euo pipefail
 #     apply는 배포 락이 모두 사라질 때까지 기다린다. 동시에 시작해도 한쪽(배포)이 반드시 양보한다.
 #   - 비정상 종료로 남은 락은 LOCK_STALE_SECONDS(기본 2시간)가 지나면 정리한다.
 
-bucket=${LOCK_BUCKET:-42voicebridge-tfstate}
+bucket=${LOCK_BUCKET:-voicebridge}
 prefix=${LOCK_PREFIX:-locks/dev}
 wait_seconds=${LOCK_WAIT_SECONDS:-2400}
 interval=${LOCK_INTERVAL:-20}

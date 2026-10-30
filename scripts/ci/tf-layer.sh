@@ -10,7 +10,7 @@ set -euo pipefail
 # 잠금은 유지한다(-lock=false 금지). 다른 작업이 잠금을 쥐고 있으면 -lock-timeout 동안 기다린다.
 
 base_dir=${TF_BASE_DIR:-infra/environments/dev}
-state_bucket=${TF_STATE_BUCKET:-42voicebridge-tfstate}
+state_bucket=${TF_STATE_BUCKET:-voicebridge}
 layers=(1_base 2_storage 3_application)
 
 usage() {

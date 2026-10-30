@@ -62,7 +62,7 @@ environments/dev/
 └── 3_application/   # EC2 3대(be/ai/fe), FE의 Elastic IP, AI 데이터 EBS+DLM, IAM 역할 3개
 ```
 
-세 레이어는 `42voicebridge-tfstate` 버킷의 `dev/1_base/terraform.tfstate`,
+세 레이어는 `voicebridge` 버킷의 `dev/1_base/terraform.tfstate`,
 `dev/2_storage/terraform.tfstate`, `dev/3_application/terraform.tfstate`에
 각각 state를 보관합니다. `use_lockfile = true`로 동시 변경을 막습니다.
 이 잠금 설정에는 Terraform 1.10 이상이 필요합니다.

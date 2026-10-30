@@ -62,7 +62,7 @@ AWS 키 생성 화면의 **Access key ID**는 `AWS_ACCESS_KEY_ID`, **Secret acce
 
 현재 BE는 클라이언트가 `/api/v1/auth/kakao`에 보낸 `kakaoAccessToken`을 카카오 사용자 정보 API에 전달한다. **BE 서버용 카카오 API 키 환경변수는 현재 없다.** 클라이언트의 카카오 앱 설정과 이 표의 서버·CD 비밀값을 혼동하지 않는다.
 
-앱 S3 접근에는 EC2 Instance Profile을 사용한다. 따라서 **백엔드 컨테이너에 AWS 액세스 키를 주입하지 않는다.** Terraform state 버킷 `42voicebridge-tfstate` 역시 앱의 `S3_BUCKET`과 별개다.
+앱 S3 접근에는 EC2 Instance Profile을 사용한다. 따라서 **백엔드 컨테이너에 AWS 액세스 키를 주입하지 않는다.** Terraform state 버킷 `voicebridge` 역시 앱의 `S3_BUCKET`과 별개다.
 
 현재 AWS 수동 설정과 구현 순서는 [CD 준비 상태](DEPLOYMENT-SETUP.md), 설계 결정은 [ADR 목록](adr/README.md)을 참고한다.
 

@@ -12,7 +12,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket       = "42voicebridge-tfstate"
+    bucket       = "voicebridge"
     key          = "dev/3_application/terraform.tfstate"
     region       = "ap-northeast-2"
     use_lockfile = true
@@ -26,7 +26,7 @@ provider "aws" {
 data "terraform_remote_state" "base" {
   backend = "s3"
   config = {
-    bucket = "42voicebridge-tfstate"
+    bucket = "voicebridge"
     key    = "dev/1_base/terraform.tfstate"
     region = "ap-northeast-2"
   }
@@ -35,7 +35,7 @@ data "terraform_remote_state" "base" {
 data "terraform_remote_state" "storage" {
   backend = "s3"
   config = {
-    bucket = "42voicebridge-tfstate"
+    bucket = "voicebridge"
     key    = "dev/2_storage/terraform.tfstate"
     region = "ap-northeast-2"
   }

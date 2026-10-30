@@ -39,7 +39,7 @@ jobs:
         run: |
           aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output json
           bucket_region=$(aws s3api get-bucket-location \
-            --bucket 42voicebridge-tfstate \
+            --bucket voicebridge \
             --query LocationConstraint \
             --output text)
           if [[ "$bucket_region" != "$AWS_REGION" ]]; then

@@ -11,7 +11,7 @@
 | 구분 | 기술 |
 |---|---|
 | IaC | Terraform, 계층형 3-layer 구조 (`1_base` → `2_storage` → `3_application`) |
-| State | `42voicebridge-tfstate` S3 backend — 레이어별 별도 경로와 S3 잠금 파일 사용, 상위 레이어는 `terraform_remote_state`로 하위 값을 참조 |
+| State | `voicebridge` S3 backend — 레이어별 별도 경로와 S3 잠금 파일 사용, 상위 레이어는 `terraform_remote_state`로 하위 값을 참조 |
 | Cloud | AWS ap-northeast-2 (서울 리전) |
 | Compute | EC2 3대(Amazon Linux 2023): FE `t3.small`(+Caddy 엣지, Elastic IP), BE `t3.small`, AI `m7i-flex.large`(+전용 데이터 EBS). **데모 사양**(실측 후 조정) |
 | Database | RDS MySQL 8.0 `db.t3.micro` — 마스터 비밀번호는 AWS Secrets Manager가 자동 관리 |

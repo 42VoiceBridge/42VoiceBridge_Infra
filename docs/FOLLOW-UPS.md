@@ -39,13 +39,13 @@
   "Statement": [
     { "Sid": "StateList",
       "Effect": "Allow", "Action": ["s3:ListBucket"],
-      "Resource": "arn:aws:s3:::42voicebridge-tfstate" },
+      "Resource": "arn:aws:s3:::voicebridge" },
     { "Sid": "StateRead",
       "Effect": "Allow", "Action": ["s3:GetObject"],
-      "Resource": "arn:aws:s3:::42voicebridge-tfstate/dev/*" },
+      "Resource": "arn:aws:s3:::voicebridge/dev/*" },
     { "Sid": "StateLockFile",
       "Effect": "Allow", "Action": ["s3:PutObject", "s3:DeleteObject"],
-      "Resource": "arn:aws:s3:::42voicebridge-tfstate/dev/*.tflock" }
+      "Resource": "arn:aws:s3:::voicebridge/dev/*.tflock" }
   ]
 }
 ```

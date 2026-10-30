@@ -10,7 +10,7 @@
 
 ## 결정
 
-Terraform state 전용 S3 버킷 `42voicebridge-tfstate`를 앱 리소스와 별도로 유지한다. 운영자가 AWS 루트 사용자로 로그인하여 버킷을 생성했고, 버전 관리와 퍼블릭 액세스 차단을 설정했다. 그 외 생성 옵션은 기본값으로 설정했다고 전달받았다. 운영자가 확인한 버킷 리전은 `ap-northeast-2`다.
+Terraform state 전용 S3 버킷 `voicebridge`를 앱 리소스와 별도로 유지한다. 2026-10-30 새 AWS 계정으로 이전하면서 버킷을 새로 만들었다(기존 계정의 버킷 이름은 `42voicebridge-tfstate`). 운영자가 콘솔에서 버킷을 생성했고, 버전 관리와 퍼블릭 액세스 차단을 설정했다. 그 외 생성 옵션은 기본값으로 설정했다고 전달받았다. 운영자가 확인한 버킷 리전은 `ap-northeast-2`다.
 
 세 레이어는 같은 버킷에서 `dev/1_base/terraform.tfstate`, `dev/2_storage/terraform.tfstate`, `dev/3_application/terraform.tfstate`를 각각 사용한다. backend의 `use_lockfile = true`로 S3 잠금 파일을 사용한다. `2_storage`와 `3_application`의 `terraform_remote_state`도 이 원격 state를 읽는다.
 
