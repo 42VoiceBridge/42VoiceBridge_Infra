@@ -248,7 +248,7 @@ check "헬스체크를 8080으로 수행" grep -Fq "http://127.0.0.1:8080/" "$ST
 check "AI·FE 컨테이너는 건드리지 않음" container_absent voicebridge-ai
 reset_env; STUB_APP_JSON='{"JWT_SECRET":"j","NCP_TTS_API_KEY_ID":"i","NCP_TTS_API_KEY":"k","AI_SERVER_BASE_URL":"http://10.0.1.20:8000"}' run_deploy "${be_args[@]}"
 check "AI_SERVER_BASE_URL을 시크릿에서 그대로 전달(고정 사설 IP)" grep -Fxq 'AI_SERVER_BASE_URL=http://10.0.1.20:8000' "$STUB_STATE/env_file_copy"
-check "선택 필드(ANTHROPIC·KAKAO) 미설정 시 env-file에 없음" bash -c "! grep -qE '^(ANTHROPIC_API_KEY|KAKAO_)' '$STUB_STATE/env_file_copy'"
+check "선택 필드(ANTHROPIC·KAKAO·CLOVA_STT·FEATURE) 미설정 시 env-file에 없음" bash -c "! grep -qE '^(ANTHROPIC_API_KEY|KAKAO_|CLOVA_STT_|FEATURE_)' '$STUB_STATE/env_file_copy'"
 reset_env; STUB_APP_JSON='{"JWT_SECRET":"j","NCP_TTS_API_KEY_ID":"i","NCP_TTS_API_KEY":"k","ANTHROPIC_API_KEY":"sk-ant-test","KAKAO_CLIENT_ID":"kakao-id","KAKAO_REDIRECT_URI":"https://fe.example/oauth/kakao/callback","KAKAO_CLIENT_SECRET":"kakao-secret"}' run_deploy "${be_args[@]}"
 check "선택 필드가 있으면 성공" rc_is 0
 check "ANTHROPIC_API_KEY 전달" grep -Fxq 'ANTHROPIC_API_KEY=sk-ant-test' "$STUB_STATE/env_file_copy"
@@ -257,6 +257,18 @@ check "KAKAO_REDIRECT_URI 전달" grep -Fxq 'KAKAO_REDIRECT_URI=https://fe.examp
 check "KAKAO_CLIENT_SECRET 전달" grep -Fxq 'KAKAO_CLIENT_SECRET=kakao-secret' "$STUB_STATE/env_file_copy"
 check "선택 필드 값이 출력에 노출되지 않음" out_lacks "sk-ant-test"
 check "선택 필드 값이 docker 명령줄에 노출되지 않음" log_lacks "kakao-secret"
+reset_env; STUB_APP_JSON='{"JWT_SECRET":"j","NCP_TTS_API_KEY_ID":"i","NCP_TTS_API_KEY":"k","CLOVA_STT_API_KEY_ID":"stt-id","CLOVA_STT_API_KEY":"stt-key","FEATURE_SUGGESTION_ENABLED":"true","FEATURE_CONVERSATION_ENABLED":"true","FEATURE_DIAGNOSIS_ENABLED":"false"}' run_deploy "${be_args[@]}"
+check "CLOVA_STT·FEATURE 필드가 있으면 성공" rc_is 0
+check "CLOVA_STT_API_KEY_ID 전달" grep -Fxq 'CLOVA_STT_API_KEY_ID=stt-id' "$STUB_STATE/env_file_copy"
+check "CLOVA_STT_API_KEY 전달" grep -Fxq 'CLOVA_STT_API_KEY=stt-key' "$STUB_STATE/env_file_copy"
+check "FEATURE_SUGGESTION_ENABLED 전달" grep -Fxq 'FEATURE_SUGGESTION_ENABLED=true' "$STUB_STATE/env_file_copy"
+check "FEATURE_CONVERSATION_ENABLED 전달" grep -Fxq 'FEATURE_CONVERSATION_ENABLED=true' "$STUB_STATE/env_file_copy"
+check "FEATURE_DIAGNOSIS_ENABLED 전달(false도 그대로)" grep -Fxq 'FEATURE_DIAGNOSIS_ENABLED=false' "$STUB_STATE/env_file_copy"
+check "CLOVA_STT 키가 출력에 노출되지 않음" out_lacks "stt-key"
+check "CLOVA_STT 키가 docker 명령줄에 노출되지 않음" log_lacks "stt-key"
+check "없는 FEATURE 필드는 전달 안 함" bash -c "! grep -q '^FEATURE_PERSONALIZATION_ENABLED=' '$STUB_STATE/env_file_copy'"
+reset_env; STUB_APP_JSON='{"JWT_SECRET":"j","NCP_TTS_API_KEY_ID":"i","NCP_TTS_API_KEY":"k","FEATURE_CONVERSATION_ENABLED":true}' run_deploy "${be_args[@]}"
+check "FEATURE 값이 JSON boolean이면 실패" bash -c "[ $rc -ne 0 ]"
 reset_env; STUB_APP_JSON='{"JWT_SECRET":"j","NCP_TTS_API_KEY_ID":"i","NCP_TTS_API_KEY":"k","KAKAO_CLIENT_ID":"kakao-id"}' run_deploy "${be_args[@]}"
 check "일부 선택 필드만 있어도 성공하고 있는 것만 전달" bash -c "[ $rc -eq 0 ] && grep -Fxq 'KAKAO_CLIENT_ID=kakao-id' '$STUB_STATE/env_file_copy' && ! grep -q '^KAKAO_REDIRECT_URI=' '$STUB_STATE/env_file_copy'"
 reset_env; STUB_APP_JSON='{"JWT_SECRET":"j","NCP_TTS_API_KEY_ID":"i","NCP_TTS_API_KEY":"k","ANTHROPIC_API_KEY":123}' run_deploy "${be_args[@]}"
