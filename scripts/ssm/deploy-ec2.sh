@@ -429,6 +429,15 @@ case "$component" in
       echo "AI_SERVER_BASE_URL is unset; AI-dependent endpoints will be unavailable."
     fi
 
+    # 선택 필드: 시크릿에 있을 때만 전달한다(없으면 BE가 해당 기능만 끈 채로 뜬다).
+    # 카카오 인가 코드 로그인(BE #41)과 Claude API(문구 추천)용. 값은 env-file로만 넘기고 출력하지 않는다.
+    for key in ANTHROPIC_API_KEY KAKAO_CLIENT_ID KAKAO_REDIRECT_URI KAKAO_CLIENT_SECRET; do
+      value=$(jq -er --arg k "$key" '.[$k] // "" | if type == "string" then . else error("\($k) must be a string") end' <<<"$app_json")
+      if [[ -n "$value" ]]; then
+        append_env "$key" "$value"
+      fi
+    done
+
     docker pull "$image" >/dev/null
     deploy_container "$be_name" wait_be_healthy \
       --publish "$be_port:$be_port" --env-file "$env_file" "$image"

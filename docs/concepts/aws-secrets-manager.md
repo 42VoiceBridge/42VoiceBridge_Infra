@@ -8,7 +8,7 @@ AWS Secrets Manager는 API 키·암호·토큰 같은 비밀값을 암호화해 
 
 | 시크릿 | 생성·관리 방법 | 사용하는 값 |
 |---|---|---|
-| 앱 시크릿 `voicebridge/dev/app` | 운영자가 같은 AWS 계정의 서울 리전에 수동 생성·수정 | JWT 비밀값, AI 서버 URL, NCP TTS 키. **BE 인스턴스 역할만** 읽는다 |
+| 앱 시크릿 `voicebridge/dev/app` | 운영자가 같은 AWS 계정의 시드니 리전(`ap-southeast-2`, 인프라 리전)에 수동 생성·수정 | JWT 비밀값, AI 서버 URL, NCP TTS 키, (선택) 카카오 로그인·Claude API 키. **BE 인스턴스 역할만** 읽는다 |
 | GHCR 시크릿 `voicebridge/dev/ghcr` | 운영자가 수동 생성·수정 | `GHCR_USERNAME`, `GHCR_READ_TOKEN`(classic PAT, `read:packages`). **BE·AI·FE 세 역할이 읽는다.** AI·FE 인스턴스가 BE의 JWT 값을 읽지 못하도록 앱 시크릿과 분리했다 |
 | RDS 관리형 시크릿 | Terraform `2_storage`의 RDS 설정에 따라 RDS가 생성·관리 | DB 사용자 이름과 비밀번호 |
 
@@ -42,6 +42,12 @@ AWS는 루트를 일상 작업에 사용하지 않도록 권장한다. 지금은
    | `AI_SERVER_BASE_URL` | AI 인스턴스의 고정 사설 IP 주소 `http://10.0.1.20:8000`(`terraform output ai_base_url`). AI를 제외한 초기 BE 배포에서는 생략 가능 |
    | `NCP_TTS_API_KEY_ID` | AI·NAVER API의 CLOVA Voice Application **Client ID** |
    | `NCP_TTS_API_KEY` | 같은 Application의 **Client Secret** |
+   | `KAKAO_CLIENT_ID` | (선택) 카카오 개발자 콘솔 앱의 **REST API 키**. 없으면 BE의 카카오 로그인이 항상 실패한다 |
+   | `KAKAO_REDIRECT_URI` | (선택) FE가 `Kakao.Auth.authorize({ redirectUri })`에 넘기는 주소와 **정확히 같은 값**. 카카오 콘솔에도 등록 |
+   | `KAKAO_CLIENT_SECRET` | (선택) 카카오 콘솔에서 Client Secret을 켠 경우에만 |
+   | `ANTHROPIC_API_KEY` | (선택) Claude API 키(Claude Console에서 발급). BE의 문구 추천 기능이 쓴다. 없으면 그 기능만 503 |
+
+   선택 필드는 값이 있을 때만 배포 스크립트가 컨테이너에 전달한다. 값을 바꾼 뒤에는 BE를 다시 배포해야 반영된다.
 
    AWS Secrets Manager의 **Key** 칸에는 위 환경변수 이름을 그대로, **Value** 칸에는 각각의 실제 값을 입력한다. NCP 계정의 **API Authentication Key(Access Key ID / Secret Key)**는 이 두 필드에 넣는 CLOVA Voice 인증 정보가 아니다. CLOVA Voice는 NCP 콘솔의 **AI·NAVER API → Application**에서 발급한 Client ID / Client Secret을 요구한다. [NCP: CLOVA Voice 이용 신청·인증 정보](https://guide.ncloud-docs.com/docs/clovavoice-start), [NCP: 요청 헤더](https://api.ncloud-docs.com/docs/ai-naver-clovavoice)
 
@@ -67,14 +73,10 @@ AWS는 루트를 일상 작업에 사용하지 않도록 권장한다. 지금은
 
 ## 카카오 로그인 키는 지금 어디에 두는가
 
-현재 BE는 `/api/v1/auth/kakao` 요청으로 **사용자별 카카오 액세스 토큰**을 받고, 그 토큰을 `Authorization: Bearer` 헤더로 카카오 사용자 정보 API에 전달한다. BE에는 카카오 앱 키·REST API 키·Client secret을 읽는 환경변수나 배포 설정이 없다. 따라서 **현재 앱 시크릿 `voicebridge/dev/app`에 카카오 키를 추가할 필요가 없고, BE GitHub Secrets에도 넣지 않는다.** 값을 추가하더라도 현재 앱은 읽지 않는다. [BE의 카카오 사용자 정보 어댑터](https://github.com/42VoiceBridge/42VoiceBridge_BE/blob/develop/src/main/java/com/voicebridge/adapter/out/auth/KakaoUserInfoAdapter.java), [카카오 사용자 정보 API](https://developers.kakao.com/docs/en/kakaologin/rest-api)
+BE는 BE #41부터 **인가 코드 방식**으로 카카오 로그인을 처리한다. FE가 `Kakao.Auth.authorize()`로 받은 인가 코드를 `/api/v1/auth/kakao`에 보내면, BE가 카카오 토큰 API에 인가 코드를 보내 액세스 토큰을 받고 사용자 정보를 조회한다. 이때 BE에 `KAKAO_CLIENT_ID`(REST API 키)와 `KAKAO_REDIRECT_URI`가 필요하고, 콘솔에서 Client Secret을 켰다면 `KAKAO_CLIENT_SECRET`도 필요하다. 세 값은 앱 시크릿 `voicebridge/dev/app`의 선택 필드로 두고, 배포 스크립트가 있을 때만 BE 컨테이너에 전달한다. [BE의 카카오 어댑터](https://github.com/42VoiceBridge/42VoiceBridge_BE/blob/develop/src/main/java/com/voicebridge/adapter/out/auth/KakaoUserInfoAdapter.java), [카카오 로그인 REST API](https://developers.kakao.com/docs/en/kakaologin/rest-api)
 
-카카오 개발자 콘솔에 보이는 키의 종류와 실제 로그인 구현 주체는 별도로 확인한다.
-
-| 항목 | 현재 또는 향후 저장 위치 |
+| 항목 | 저장 위치 |
 |---|---|
-| 로그인 사용자의 액세스 토큰 | 로그인 요청마다 클라이언트가 BE에 전달하는 단기 토큰. 고정 배포 시크릿으로 저장하지 않음 |
-| 웹·모바일 앱의 플랫폼 키 | 해당 클라이언트 앱 설정에서 관리. 현재 BE 배포 시크릿에 넣지 않음 |
-| 카카오 REST API `client_secret` | 향후 **BE가 인가 코드로 토큰을 직접 발급·갱신하는 방식**을 구현한다면 서버 측 비밀값으로 보관. 그때 AWS Secrets Manager와 BE 환경변수·배포 스크립트를 함께 변경 |
-
-카카오의 REST API 토큰 발급에서는 설정에 따라 `client_secret`이 필요하다. 지금 BE는 그 토큰 발급 API를 호출하지 않는다. [카카오 로그인 REST API 문서](https://developers.kakao.com/docs/en/kakaologin/rest-api)
+| 카카오 REST API 키, Redirect URI, (켠 경우) Client Secret | 앱 시크릿 `voicebridge/dev/app` → BE 환경변수 |
+| 웹 앱의 JavaScript 키 | FE 빌드 설정(`VITE_KAKAO_JAVASCRIPT_KEY`). BE 시크릿에 넣지 않음 |
+| 로그인 사용자의 인가 코드·액세스 토큰 | 요청마다 오가는 단기 값. 저장하지 않음 |

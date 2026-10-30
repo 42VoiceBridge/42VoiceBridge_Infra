@@ -248,6 +248,20 @@ check "헬스체크를 8080으로 수행" grep -Fq "http://127.0.0.1:8080/" "$ST
 check "AI·FE 컨테이너는 건드리지 않음" container_absent voicebridge-ai
 reset_env; STUB_APP_JSON='{"JWT_SECRET":"j","NCP_TTS_API_KEY_ID":"i","NCP_TTS_API_KEY":"k","AI_SERVER_BASE_URL":"http://10.0.1.20:8000"}' run_deploy "${be_args[@]}"
 check "AI_SERVER_BASE_URL을 시크릿에서 그대로 전달(고정 사설 IP)" grep -Fxq 'AI_SERVER_BASE_URL=http://10.0.1.20:8000' "$STUB_STATE/env_file_copy"
+check "선택 필드(ANTHROPIC·KAKAO) 미설정 시 env-file에 없음" bash -c "! grep -qE '^(ANTHROPIC_API_KEY|KAKAO_)' '$STUB_STATE/env_file_copy'"
+reset_env; STUB_APP_JSON='{"JWT_SECRET":"j","NCP_TTS_API_KEY_ID":"i","NCP_TTS_API_KEY":"k","ANTHROPIC_API_KEY":"sk-ant-test","KAKAO_CLIENT_ID":"kakao-id","KAKAO_REDIRECT_URI":"https://fe.example/oauth/kakao/callback","KAKAO_CLIENT_SECRET":"kakao-secret"}' run_deploy "${be_args[@]}"
+check "선택 필드가 있으면 성공" rc_is 0
+check "ANTHROPIC_API_KEY 전달" grep -Fxq 'ANTHROPIC_API_KEY=sk-ant-test' "$STUB_STATE/env_file_copy"
+check "KAKAO_CLIENT_ID 전달" grep -Fxq 'KAKAO_CLIENT_ID=kakao-id' "$STUB_STATE/env_file_copy"
+check "KAKAO_REDIRECT_URI 전달" grep -Fxq 'KAKAO_REDIRECT_URI=https://fe.example/oauth/kakao/callback' "$STUB_STATE/env_file_copy"
+check "KAKAO_CLIENT_SECRET 전달" grep -Fxq 'KAKAO_CLIENT_SECRET=kakao-secret' "$STUB_STATE/env_file_copy"
+check "선택 필드 값이 출력에 노출되지 않음" out_lacks "sk-ant-test"
+check "선택 필드 값이 docker 명령줄에 노출되지 않음" log_lacks "kakao-secret"
+reset_env; STUB_APP_JSON='{"JWT_SECRET":"j","NCP_TTS_API_KEY_ID":"i","NCP_TTS_API_KEY":"k","KAKAO_CLIENT_ID":"kakao-id"}' run_deploy "${be_args[@]}"
+check "일부 선택 필드만 있어도 성공하고 있는 것만 전달" bash -c "[ $rc -eq 0 ] && grep -Fxq 'KAKAO_CLIENT_ID=kakao-id' '$STUB_STATE/env_file_copy' && ! grep -q '^KAKAO_REDIRECT_URI=' '$STUB_STATE/env_file_copy'"
+reset_env; STUB_APP_JSON='{"JWT_SECRET":"j","NCP_TTS_API_KEY_ID":"i","NCP_TTS_API_KEY":"k","ANTHROPIC_API_KEY":123}' run_deploy "${be_args[@]}"
+check "선택 필드가 문자열이 아니면 실패(jq 오류로 0이 아닌 종료)" bash -c "[ $rc -ne 0 ]"
+check "선택 필드 형식 오류 시 이미지 pull 전에 실패" log_lacks "docker pull"
 reset_env; STUB_APP_JSON='{"JWT_SECRET":"j"}' run_deploy "${be_args[@]}"
 check "필수 시크릿 필드 누락 → 실패" rc_is 1
 check "누락 시 이미지 pull 전에 실패" log_lacks "docker pull"
