@@ -11,11 +11,13 @@
 | 배포 스크립트 동작(롤백, 마운트 거부, 포트, GHCR 폴백, 엣지 설정, 입력 삽입 방지) | **확인됨(스텁)** | docker/aws를 스텁으로 대체한 테스트 105개 |
 | `run.sh` 흐름(인스턴스별 대상, 순서, 실패 시 중단, 기록·복원) | **확인됨(스텁)** | 테스트 57개 |
 | 이벤트 검증·출처 검증·락(경쟁 포함)·레이어별 plan/apply·워크플로 구조 | **확인됨(스텁/YAML)** | 테스트 28 + 29 + 47 + 46개 |
-| `terraform plan`이 실제 AWS에서 의도한 리소스를 만드는지 | **미확인** | AWS 자격 증명 대기 |
-| 실제 EC2에서 user_data(볼륨 포맷·마운트), 배포, TLS 발급 | **미확인** | AWS에 적용하지 않음 |
+| `terraform plan`·`apply`가 실제 AWS에서 의도한 리소스를 만드는지 | **확인됨** | 2026-10-03 세 레이어 apply. 과정에서 찾은 문제 4개는 [`deploy-step.md`](../deploy-step.md)에 기록 |
+| 실제 EC2에서 user_data(Docker 설치, 볼륨 포맷·마운트) | **확인됨** | SSM `check` 모드로 세 인스턴스 확인 |
+| 데모 사양 변경(AI `m7i-flex.large`, Redis `cache.t4g.micro`)이 이 계정의 Free 플랜에서 apply되는지 | **미확인** | [사양·비용](OPERATIONS-SIZING.md) |
 | 실제 GHCR pull(PAT 권한), Hugging Face 다운로드 시간 | **미확인** | |
-| Let's Encrypt가 EIP 공개 DNS 이름으로 인증서를 발급하는지 | **미확인** | 첫 배포에서 확인([네트워크·엣지 가이드](NETWORK-AND-EDGE.md)) |
-| GitHub Actions에서의 실제 실행(재사용 워크플로, 아티팩트 다운로드, `--if-none-match` 락) | **미확인** | 워크플로를 실행한 적이 없다. `infra-tests`(오프라인)만 GitHub에서 실행된다 |
+| Let's Encrypt가 EIP 공개 DNS 이름으로 인증서를 발급하는지 | **거부됨** | 2026-10-05 Caddy 로그(`rejectedIdentifier`). `3-34-9-37.sslip.io`로 전환 |
+| sslip.io 이름으로 인증서가 발급되는지 | **미확인** | [네트워크·엣지 가이드](NETWORK-AND-EDGE.md) |
+| GitHub Actions에서의 실제 실행(재사용 워크플로, 아티팩트 다운로드, `--if-none-match` 락) | **일부 확인** | `terraform-plan`·`terraform-apply`·`ssm-deploy`는 수동으로 여러 번 실행됐다. 소스 레포 이벤트(`repository_dispatch`)로의 실행은 미확인 |
 
 스텁 테스트는 스크립트 논리를 검증할 뿐 실제 Docker/AWS의 동작을 대신하지 않는다. 아래 4~5단계가 그 간극을 메운다.
 
@@ -171,7 +173,8 @@ echo | openssl s_client -connect "$HOST:443" -servername "$HOST" 2>/dev/null | o
 
 ## 6. 알려진 미검증·제한 (확인 후 지울 것)
 
-- Let's Encrypt가 EIP 공개 DNS 이름으로 발급하는지, 발급 한도에 걸리는지
+- Let's Encrypt가 sslip.io 이름으로 발급하는지, 발급 한도에 걸리는지(EIP 공개 DNS 이름은 거부됨)
+- AI `m7i-flex.large`가 이 계정의 Free 플랜에서 허용되는지
 - `put-object --if-none-match`(S3 조건부 쓰기)를 쓰는 락이 GitHub 러너의 AWS CLI에서 동작하는지(필요 버전 확인)
 - 배포용 IAM 사용자에 `locks/dev/*` 쓰기, SSM Parameter Store `/voicebridge/dev/deployed/*` 쓰기·읽기 권한이 있는지([후속 작업](FOLLOW-UPS.md))
 - BE CI가 아직 `deploy-backend`를 보내지 않는다. BE의 RDS 초기 스키마 방법과 헬스 엔드포인트가 없다

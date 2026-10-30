@@ -2,9 +2,9 @@
 
 [FE](https://github.com/42VoiceBridge/42VoiceBridge_FE)·[BE](https://github.com/42VoiceBridge/42VoiceBridge_BE)·[AI](https://github.com/42VoiceBridge/42VoiceBridge_AI)가 올라가는 AWS 인프라를 Terraform으로 관리하는 저장소입니다. **FE·BE·AI 개별 EC2 3대** + RDS MySQL + ElastiCache Redis + S3(녹음/TTS 오디오)로 구성되며([ADR 0006](docs/adr/0006-three-instance-topology.md)), 네이버 클로바 보이스는 이 인프라 범위 밖의 외부 서비스입니다. 각 레포의 CI가 이미지를 게시한 뒤 이 저장소의 워크플로를 호출해 해당 인스턴스의 이미지만 교체합니다.
 
-> 2026-10-03 기준 **코드와 오프라인 테스트까지 구현**했고 **AWS에는 적용하지 않았습니다.** 확인된 것과 아닌 것은 [인프라 검증 가이드](docs/INFRA-VERIFICATION.md)에 있습니다.
+> 2026-10-03에 세 레이어를 **실제 AWS에 적용**했고, 2026-10-30에 사양을 **데모용**으로 조정했습니다(AI `m7i-flex.large`, Redis `cache.t4g.micro`). 진행 상황은 [`deploy-step.md`](deploy-step.md), 확인된 것과 아닌 것은 [인프라 검증 가이드](docs/INFRA-VERIFICATION.md)에 있습니다.
 
-> ⚠️ 상시 가동하지 않고 테스트할 때만 `apply` → 끝나면 즉시 `destroy` 합니다. 자세한 비용/실행 순서는 [`docs/GUIDE.md`](docs/GUIDE.md) 참고.
+> ⚠️ 상시 가동하지 않습니다. 가동 중 시간당 약 $0.235(24/7이면 월 약 $187)이고, 시연·테스트가 없을 때는 EC2를 중지합니다. 비용은 [`docs/OPERATIONS-SIZING.md`](docs/OPERATIONS-SIZING.md), 실행 순서는 [`docs/GUIDE.md`](docs/GUIDE.md) 참고.
 
 ## 기술 스택
 
@@ -13,9 +13,9 @@
 | IaC | Terraform, 계층형 3-layer 구조 (`1_base` → `2_storage` → `3_application`) |
 | State | `42voicebridge-tfstate` S3 backend — 레이어별 별도 경로와 S3 잠금 파일 사용, 상위 레이어는 `terraform_remote_state`로 하위 값을 참조 |
 | Cloud | AWS ap-northeast-2 (서울 리전) |
-| Compute | EC2 3대(Amazon Linux 2023): FE(+Caddy 엣지, Elastic IP), BE, AI(+전용 데이터 EBS). 사양은 모두 **초기 시험 사양**(실측 후 확정) |
-| Database | RDS MySQL 8.0 — 마스터 비밀번호는 AWS Secrets Manager가 자동 관리 |
-| Cache | ElastiCache Redis 7.1 |
+| Compute | EC2 3대(Amazon Linux 2023): FE `t3.small`(+Caddy 엣지, Elastic IP), BE `t3.small`, AI `m7i-flex.large`(+전용 데이터 EBS). **데모 사양**(실측 후 조정) |
+| Database | RDS MySQL 8.0 `db.t3.micro` — 마스터 비밀번호는 AWS Secrets Manager가 자동 관리 |
+| Cache | ElastiCache Redis 7.1 `cache.t4g.micro` |
 | Storage | S3 — 녹음/TTS 오디오 저장, 퍼블릭 액세스 완전 차단 |
 | Network | VPC — 퍼블릭 서브넷 1개(FE·BE·AI, 고정 사설 IP) + 프라이빗 서브넷 2개(RDS/Redis), NAT 게이트웨이 없음 |
 | IAM | 인스턴스별 역할 3개(최소 권한): 공통 SSM·배포 스크립트·GHCR 시크릿, BE만 앱·RDS 시크릿과 버킷 쓰기, AI는 `ai/*` 읽기만 |
@@ -65,7 +65,7 @@ graph TB
 - **ai-sg**: **be-sg에서 온 8000만** 허용(AI는 인증이 없어 이 규칙이 유일한 접근 통제). SSH 없음.
 - **rds-sg / redis-sg**: be-sg에서 오는 트래픽만 각각 3306/6379로 허용 — 인터넷에서 직접 접근 불가.
 - 프라이빗 서브넷에는 NAT 게이트웨이를 두지 않았습니다. 그래서 GHCR pull, 모델 다운로드, SSM이 필요한 세 인스턴스는 모두 퍼블릭 서브넷에 둡니다.
-- 도메인이 없으면 FE의 Elastic IP 공개 DNS 이름으로 HTTPS를 발급받습니다. 자세한 내용과 한계는 [네트워크·엣지 가이드](docs/NETWORK-AND-EDGE.md).
+- 도메인이 없어서 FE Elastic IP를 이름에 담은 무료 `3-34-9-37.sslip.io`로 HTTPS를 발급받습니다(Let's Encrypt는 EIP 공개 DNS 이름 `*.compute.amazonaws.com`을 거부). 자세한 내용과 한계는 [네트워크·엣지 가이드](docs/NETWORK-AND-EDGE.md).
 
 ## CI/CD 파이프라인
 
@@ -114,7 +114,7 @@ sequenceDiagram
 - 이벤트 배포, 락, 레이어별 plan/apply, 저장소 설정: [`docs/CICD-FLOW.md`](docs/CICD-FLOW.md)
 - AI 인스턴스 배포, 데이터 볼륨, 프롬프트 풀, 배포 체크리스트: [`docs/AI-DEPLOYMENT.md`](docs/AI-DEPLOYMENT.md)
 - AI 데이터 백업·삭제·복원 절차: [`docs/DATA-PROTECTION.md`](docs/DATA-PROTECTION.md)
-- 사양·비용 추정치와 확정 절차: [`docs/OPERATIONS-SIZING.md`](docs/OPERATIONS-SIZING.md)
+- 데모 사양, 비용 계산, 사양 확정 절차: [`docs/OPERATIONS-SIZING.md`](docs/OPERATIONS-SIZING.md)
 - **후속 작업(호출 방식, AWS 키, 도메인 등)**: [`docs/FOLLOW-UPS.md`](docs/FOLLOW-UPS.md)
 - AI를 제외한 BE 선배포 범위와 실행 순서: [`docs/BE-ONLY-DEPLOYMENT.md`](docs/BE-ONLY-DEPLOYMENT.md)
 - AWS 계정·IAM 역할·Secrets Manager 개념과 앱 시크릿 등록: [`docs/concepts/README.md`](docs/concepts/README.md)

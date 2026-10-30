@@ -4,8 +4,8 @@
 project_name = "voicebridge"
 aws_region   = "ap-northeast-2"
 
-rds_instance_class = "db.r5.large"
-redis_node_type    = "cache.m5.large"
+rds_instance_class = "db.t3.micro"
+redis_node_type    = "cache.t4g.micro"
 
 db_name     = "voicebridge"
 db_username = "voicebridge_admin"

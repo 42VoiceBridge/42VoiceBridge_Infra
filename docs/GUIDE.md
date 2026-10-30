@@ -12,11 +12,11 @@ EC2 3대(FE·BE·AI 개별 인스턴스) + RDS MySQL + ElastiCache Redis + S3(�
 
 ## ⚠️ 반드시 읽으세요: 비용 경고
 
-예전 단일 EC2 구성은 **서울 리전 기준 24/7 가동 시 시간당 약 $0.61, 월 약 $445**로
-추정됐습니다 (EC2 m5.large + RDS db.r5.large + ElastiCache cache.m5.large 기준).
-인스턴스 3대(AI `m5.xlarge`, FE `t3.small` 포함)와 공인 IPv4를 더하면 **약 $0.9/시간**으로 추정하지만,
-**이 수치들은 AWS 요금 계산기로 확인한 값이 아닌 추정치**입니다([사양·비용 확정 절차](OPERATIONS-SIZING.md)).
-**절대 상시 가동하지 마세요.** AWS 크레딧(약 $100)은 상시 가동 기준 며칠 분량일 수 있습니다.
+현재 데모 사양(AI `m7i-flex.large`, BE·FE `t3.small`, RDS `db.t3.micro`, Redis `cache.t4g.micro`)은
+**서울 리전 기준 가동 중 시간당 약 $0.235, 24/7 가동 시 월 약 $187**입니다(AWS Pricing API 단가, 2026-10-30).
+EC2를 중지해도 RDS·Redis·Elastic IP·EBS 요금은 계속 나갑니다. 평일 10시간만 켜면 월 약 $95입니다.
+계산 근거와 운영 방식별 금액은 [사양·비용](OPERATIONS-SIZING.md)에 있습니다.
+**상시 가동하지 마세요.** AWS 크레딧(약 $100)은 24/7 기준 약 16일 분량입니다.
 
 > **테스트가 끝나면 반드시 `terraform destroy`를 실행하세요.**
 > `apply` 상태로 며칠만 방치해도 비용이 크게 늘어날 수 있습니다.

@@ -19,7 +19,7 @@ variable "rds_instance_class" {
 variable "redis_node_type" {
   description = "ElastiCache Redis node type"
   type        = string
-  default     = "cache.m5.large"
+  default     = "cache.t4g.micro"
 }
 
 variable "db_name" {
