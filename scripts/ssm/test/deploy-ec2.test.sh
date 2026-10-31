@@ -238,6 +238,8 @@ reset_env; run_deploy "${be_args[@]}"
 check "종료코드 0" rc_is 0
 check "BE는 호스트 8080 = 컨테이너 8080 (be-sg 8080과 일치)" run_has voicebridge-be "--publish 8080:8080"
 check "예전 80:8080 매핑이 남아 있지 않음" run_lacks voicebridge-be "--publish 80:8080"
+check "BE 로그 순환 옵션(10MB x 3)" run_has voicebridge-be "max-size=10m"
+check "BE 로그 파일 개수 제한" run_has voicebridge-be "max-file=3"
 check "Docker 네트워크를 만들지 않음" log_lacks "network create"
 check "env-file 사용" grep -q 'JWT_SECRET=jwt-value' "$STUB_STATE/env_file_copy"
 check "DB 접속 정보가 env-file에 들어감" grep -q 'DB_PASSWORD=dbpass' "$STUB_STATE/env_file_copy"

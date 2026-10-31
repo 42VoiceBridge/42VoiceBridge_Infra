@@ -442,8 +442,11 @@ case "$component" in
     done
 
     docker pull "$image" >/dev/null
+    # 로그는 AI와 같이 순환시킨다(최대 10MB x 3개). 넘으면 오래된 로그부터 지워져 보관량이 30MB를 넘지 않는다.
+    # 개인정보처리방침의 서버 로그 보관 기준이다. 바꾸면 처리방침도 같이 고친다.
     deploy_container "$be_name" wait_be_healthy \
-      --publish "$be_port:$be_port" --env-file "$env_file" "$image"
+      --publish "$be_port:$be_port" --env-file "$env_file" \
+      --log-opt max-size=10m --log-opt max-file=3 "$image"
     echo "Deployed $image; HTTP endpoint responded on port $be_port."
     ;;
   ai)
